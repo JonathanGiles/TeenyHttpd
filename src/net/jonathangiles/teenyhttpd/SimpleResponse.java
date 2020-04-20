@@ -8,7 +8,8 @@ public class SimpleResponse extends Response {
     final String[] headers;
     final byte[] body;
 
-    public SimpleResponse(final String[] headers, final byte[] body) {
+    public SimpleResponse(final Request request, final String[] headers, final byte[] body) {
+        super(request);
         this.headers = headers;
         this.body = body;
     }
