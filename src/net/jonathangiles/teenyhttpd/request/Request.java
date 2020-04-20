@@ -1,6 +1,10 @@
-package net.jonathangiles.teenyhttpd;
+package net.jonathangiles.teenyhttpd.request;
+
+import net.jonathangiles.teenyhttpd.Header;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -9,6 +13,7 @@ public class Request {
     private final String path;
     private final QueryParams queryParams;
     private List<Header> headers;
+    private Map<String, String> headersMap;
 
     public Request(final Method method, final String path, QueryParams queryParams) {
         this.method = method;
@@ -29,6 +34,16 @@ public class Request {
             headers = new ArrayList<>();
         }
         headers.add(header);
+    }
+
+    public Map<String, String> getHeaders() {
+        if (headersMap == null) {
+            headersMap = new LinkedHashMap<>();
+            headers.forEach(header -> {
+                headersMap.put(header.getKey(), header.getValue());
+            });
+        }
+        return headersMap;
     }
 
     public Map<String, String> getQueryParams() {

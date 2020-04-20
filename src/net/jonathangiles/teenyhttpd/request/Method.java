@@ -1,4 +1,4 @@
-package net.jonathangiles.teenyhttpd;
+package net.jonathangiles.teenyhttpd.request;
 
 public enum Method {
     OPTIONS,

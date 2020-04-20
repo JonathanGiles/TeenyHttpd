@@ -1,4 +1,4 @@
-package net.jonathangiles.teenyhttpd;
+package net.jonathangiles.teenyhttpd.request;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -21,14 +21,14 @@ public class QueryParams {
             if (allParams == null || allParams.isEmpty()) {
                 map = Collections.emptyMap();
             } else {
-                Map<String, String> tempMap = new HashMap<>();
+                final Map<String, String> tempMap = new HashMap<>();
 
-                for (String param : allParams.split("&")) {
-                    String[] keyValue = param.split("=", 2);
+                for (final String param : allParams.split("&")) {
+                    final String[] keyValue = param.split("=", 2);
 
                     try {
-                        String key = URLDecoder.decode(keyValue[0], "UTF-8");
-                        String value = keyValue.length > 1 ? URLDecoder.decode(keyValue[1], "UTF-8") : "";
+                        final String key = URLDecoder.decode(keyValue[0], "UTF-8");
+                        final String value = keyValue.length > 1 ? URLDecoder.decode(keyValue[1], "UTF-8") : "";
                         if (!key.isEmpty()) {
                             tempMap.put(key, value);
                         }

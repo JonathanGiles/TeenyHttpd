@@ -1,7 +1,8 @@
 package net.jonathangiles.teenyhttpd;
 
+import net.jonathangiles.teenyhttpd.request.Request;
 import net.jonathangiles.teenyhttpd.response.Response;
-import net.jonathangiles.teenyhttpd.response.ByteResponse;
+import net.jonathangiles.teenyhttpd.response.StatusCode;
 import net.jonathangiles.teenyhttpd.response.StringResponse;
 
 public class Main {

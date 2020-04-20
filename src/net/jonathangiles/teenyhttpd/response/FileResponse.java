@@ -1,8 +1,7 @@
 package net.jonathangiles.teenyhttpd.response;
 
-import net.jonathangiles.teenyhttpd.Method;
-import net.jonathangiles.teenyhttpd.Request;
-import net.jonathangiles.teenyhttpd.StatusCode;
+import net.jonathangiles.teenyhttpd.request.Method;
+import net.jonathangiles.teenyhttpd.request.Request;
 
 import java.io.BufferedOutputStream;
 import java.io.File;

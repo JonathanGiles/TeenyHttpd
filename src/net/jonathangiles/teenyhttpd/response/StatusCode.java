@@ -1,6 +1,7 @@
-package net.jonathangiles.teenyhttpd;
+package net.jonathangiles.teenyhttpd.response;
 
 public enum StatusCode {
+    // https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html
 
     OK(200, "OK"),
     FILE_NOT_FOUND(404, "File Not Found"),

@@ -1,5 +1,8 @@
 package net.jonathangiles.teenyhttpd;
 
+import net.jonathangiles.teenyhttpd.request.Method;
+import net.jonathangiles.teenyhttpd.request.QueryParams;
+import net.jonathangiles.teenyhttpd.request.Request;
 import net.jonathangiles.teenyhttpd.response.FileResponse;
 import net.jonathangiles.teenyhttpd.response.Response;
 
