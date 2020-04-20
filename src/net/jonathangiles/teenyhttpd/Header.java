@@ -5,7 +5,7 @@ public class Header {
     private String key;
     private String value;
 
-    public Header(String keyValue) {
+    public Header(final String keyValue) {
         this.keyValue = keyValue;
     }
 
@@ -29,7 +29,7 @@ public class Header {
     }
 
     private void parse() {
-        String[] split = keyValue.split(":", 2);
+        final String[] split = keyValue.split(":", 2);
         key = split[0].trim();
         value = split[1].trim();
     }

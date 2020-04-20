@@ -55,7 +55,7 @@ public class TeenyHttpd {
         executorService.shutdown();
     }
 
-    public Response serve(Request request) {
+    public Response serve(final Request request) {
         return new FileResponse(request);
     }
 
@@ -81,7 +81,7 @@ public class TeenyHttpd {
             final String requestUri = parse.nextToken().toLowerCase();
 
             // split it at the query param, if it exists
-            Request request;
+            final Request request;
             if (requestUri.contains("?")) {
                 final String[] uriSplit = requestUri.split("\\?", 2);
 

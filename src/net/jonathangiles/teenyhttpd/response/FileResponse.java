@@ -16,10 +16,9 @@ public class FileResponse extends Response {
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
 
-    private StatusCode statusCode;
-    private List<String> headers;
+    private final StatusCode statusCode;
+    private final List<String> headers;
     private File fileToReturn;
-    private int fileLength;
 
     public FileResponse(final Request request) {
         super(request);
@@ -29,32 +28,32 @@ public class FileResponse extends Response {
 
         fileToReturn = null;
 
-        // we support only GET and HEAD methods, we check
-        if (! (method == Method.GET || method == Method.HEAD)) {
-            // we return the not supported file to the client
-            fileToReturn = getFile(METHOD_NOT_SUPPORTED);
-            statusCode = StatusCode.NOT_IMPLEMENTED;
-        } else {
-            // GET or HEAD method
-            if (path.endsWith("/")) {
-                path += DEFAULT_FILE;
-            }
+        switch (method) {
+            case GET: {
+                if (path.endsWith("/")) {
+                    path += DEFAULT_FILE;
+                }
 
-            if (method == Method.GET) { // GET method so we return content
                 fileToReturn = getFile(path);
                 if (!fileToReturn.exists()) {
                     fileToReturn = getFile(FILE_NOT_FOUND);
-                    statusCode = StatusCode.FILE_NOT_FOUND;
+                    statusCode = StatusCode.NOT_FOUND;
                 } else {
                     statusCode = StatusCode.OK;
                 }
+                break;
+            }
+            default: {
+                fileToReturn = getFile(METHOD_NOT_SUPPORTED);
+                statusCode = StatusCode.NOT_IMPLEMENTED;
+                break;
             }
         }
 
-        fileLength = (int) fileToReturn.length();
+        final int fileLength = (int) fileToReturn.length();
 
         headers = new ArrayList<>();
-        headers.add("Content-type: " + getContentType(path));
+        headers.add("Content-type: " + getContentType(fileToReturn));
         headers.add("Content-length: " + fileLength);
     }
 
@@ -69,21 +68,22 @@ public class FileResponse extends Response {
     }
 
     @Override
-    public void writeBody(BufferedOutputStream dataOut) throws IOException {
+    public void writeBody(final BufferedOutputStream dataOut) throws IOException {
         Files.copy(fileToReturn.toPath(), dataOut);
         dataOut.flush();
     }
 
     // return supported MIME Types
-    private String getContentType(String fileRequested) {
-        if (fileRequested.endsWith(".htm") || fileRequested.endsWith(".html")) {
+    private String getContentType(final File file) {
+        final String filename = file.getName();
+        if (filename.endsWith(".htm") || filename.endsWith(".html")) {
             return "text/html";
         } else {
             return "text/plain";
         }
     }
 
-    private File getFile(String filename) {
+    private File getFile(final String filename) {
         return new File(WEB_ROOT, filename);
     }
 }

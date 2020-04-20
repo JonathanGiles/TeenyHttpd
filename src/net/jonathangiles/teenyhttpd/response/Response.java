@@ -9,7 +9,7 @@ import java.util.List;
 public abstract class Response {
     private final Request request;
 
-    protected Response(Request request) {
+    protected Response(final Request request) {
         this.request = request;
     }
 

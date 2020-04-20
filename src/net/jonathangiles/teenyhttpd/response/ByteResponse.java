@@ -12,19 +12,19 @@ public class ByteResponse extends Response {
     final List<String> headers;
     final byte[] body;
 
-    public ByteResponse(final Request request, StatusCode statusCode) {
+    public ByteResponse(final Request request, final StatusCode statusCode) {
         this(request, statusCode, Collections.emptyList());
     }
 
-    public ByteResponse(final Request request, StatusCode statusCode, final List<String> headers) {
+    public ByteResponse(final Request request, final StatusCode statusCode, final List<String> headers) {
         this(request, statusCode, headers, null);
     }
 
-    public ByteResponse(final Request request, StatusCode statusCode, final byte[] body) {
+    public ByteResponse(final Request request, final StatusCode statusCode, final byte[] body) {
         this(request, statusCode, Collections.emptyList(), body);
     }
 
-    public ByteResponse(final Request request, StatusCode statusCode, final List<String> headers, final byte[] body) {
+    public ByteResponse(final Request request, final StatusCode statusCode, final List<String> headers, final byte[] body) {
         super(request);
         this.statusCode = statusCode;
         this.headers = headers;
