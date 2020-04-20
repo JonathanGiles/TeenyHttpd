@@ -1,4 +1,3 @@
-# Project exclude paths
 /out/
 /.idea/
-/TeenyHttpd.iml
+*.iml

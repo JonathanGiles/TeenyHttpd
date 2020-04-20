@@ -1,23 +1,21 @@
 package net.jonathangiles.teenyhttpd;
 
+import net.jonathangiles.teenyhttpd.response.FileResponse;
+import net.jonathangiles.teenyhttpd.response.Response;
+
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class TeenyHttpd {
-
-    static final File WEB_ROOT = new File("./wwwroot");
-    static final String DEFAULT_FILE = "index.html";
-    static final String FILE_NOT_FOUND = "404.html";
-    static final String METHOD_NOT_SUPPORTED = "not_supported.html";
 
     private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
@@ -57,20 +55,52 @@ public class TeenyHttpd {
             if (input == null) {
                 return;
             }
-            System.out.println(input);
 
-            // we parse the request with a string tokenizer
+            // we parse the request line - https://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html
+            // For now we do not care about the HTTP Version
             final StringTokenizer parse = new StringTokenizer(input);
-            final String method = parse.nextToken().toUpperCase(); // we get the HTTP method of the client
 
-            // we get file requested
-            String path = parse.nextToken().toLowerCase();
+            // the HTTP Method
+            final Method method = Method.valueOf(parse.nextToken().toUpperCase());
 
-            Request request = new Request(method, path);
-            Response response = serve(request);
+            // we get request-uri requested. For now we assume it is an absolute path
+            final String requestUri = parse.nextToken().toLowerCase();
+
+            // split it at the query param, if it exists
+            Request request;
+            if (requestUri.contains("?")) {
+                final String[] uriSplit = requestUri.split("\\?", 2);
+
+                // create a lazily-evaluated object to represent the query parameters
+                request = new Request(method, uriSplit[0], new QueryParams(uriSplit[1]));
+            } else {
+                request = new Request(method, requestUri, QueryParams.EMPTY);
+            }
+
+            // read (but not parse) all request headers and put them into the request.
+            // They will be parsed on-demand.
+            String line;
+            while (true) {
+                line = in.readLine();
+                if (line == null || line.isEmpty() || "\r\n".equals(line)) {
+                    break;
+                }
+                request.addHeader(new Header(line));
+            }
+
+            final Response response = serve(request);
 
             if (response != null) {
-                response.send(out, dataOut);
+                // write headers
+                out.println(response.getStatusCode().toString());
+                out.println("Server: TeenyHttpd from JonathanGiles.net : 1.0");
+                out.println("Date: " + LocalDateTime.now());
+                response.getHeaders().forEach(out::println);
+                out.println(); // empty line between header and body
+                out.flush();   // flush character output stream buffer
+
+                // write body
+                response.writeBody(dataOut);
             }
         } catch (IOException ioe) {
             System.err.println("Server error : " + ioe);
