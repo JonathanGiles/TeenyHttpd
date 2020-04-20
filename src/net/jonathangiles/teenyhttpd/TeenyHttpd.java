@@ -17,23 +17,30 @@ import java.time.LocalDateTime;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 public class TeenyHttpd {
 
-    private ExecutorService executorService = Executors.newSingleThreadExecutor();
-
     private final int port;
+    private final Supplier<? extends ExecutorService> executorSupplier;
+
+    private ExecutorService executorService;
     private boolean isRunning = false;
 
-    public TeenyHttpd(int port) {
+    public TeenyHttpd(final int port) {
+        this(port, Executors::newSingleThreadExecutor);
+    }
+
+    public TeenyHttpd(final int port, final Supplier<? extends ExecutorService> executorSupplier) {
         this.port = port;
+        this.executorSupplier = executorSupplier;
     }
 
     public void start() {
         isRunning = true;
-        executorService = Executors.newSingleThreadExecutor();
+        executorService = executorSupplier.get();
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+        try (final ServerSocket serverSocket = new ServerSocket(port)) {
             while (isRunning) {
                 final Socket connect = serverSocket.accept();
                 executorService.execute(() -> run(connect));
@@ -48,10 +55,14 @@ public class TeenyHttpd {
         executorService.shutdown();
     }
 
+    public Response serve(Request request) {
+        return new FileResponse(request);
+    }
+
     private void run(final Socket connect) {
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(connect.getInputStream()));
-             PrintWriter out = new PrintWriter(connect.getOutputStream());
-             BufferedOutputStream dataOut = new BufferedOutputStream(connect.getOutputStream())) {
+        try (final BufferedReader in = new BufferedReader(new InputStreamReader(connect.getInputStream()));
+             final PrintWriter out = new PrintWriter(connect.getOutputStream());
+             final BufferedOutputStream dataOut = new BufferedOutputStream(connect.getOutputStream())) {
 
             // get first line of the request from the client
             final String input = in.readLine();
@@ -114,9 +125,5 @@ public class TeenyHttpd {
                 e.printStackTrace();
             }
         }
-    }
-
-    public Response serve(Request request) {
-        return new FileResponse(request);
     }
 }
