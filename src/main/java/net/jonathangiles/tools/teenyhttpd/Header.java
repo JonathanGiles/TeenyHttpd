@@ -1,4 +1,4 @@
-package net.jonathangiles.teenyhttpd;
+package net.jonathangiles.tools.teenyhttpd;
 
 public class Header {
     private final String keyValue;

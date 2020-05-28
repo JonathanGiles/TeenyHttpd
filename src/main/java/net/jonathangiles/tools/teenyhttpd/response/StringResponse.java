@@ -1,6 +1,6 @@
-package net.jonathangiles.teenyhttpd.response;
+package net.jonathangiles.tools.teenyhttpd.response;
 
-import net.jonathangiles.teenyhttpd.request.Request;
+import net.jonathangiles.tools.teenyhttpd.request.Request;
 
 import java.util.List;
 

@@ -1,4 +1,4 @@
-package net.jonathangiles.teenyhttpd.response;
+package net.jonathangiles.tools.teenyhttpd.response;
 
 public enum StatusCode {
     // https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html

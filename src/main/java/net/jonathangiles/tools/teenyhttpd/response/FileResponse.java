@@ -1,20 +1,23 @@
-package net.jonathangiles.teenyhttpd.response;
+package net.jonathangiles.tools.teenyhttpd.response;
 
-import net.jonathangiles.teenyhttpd.request.Method;
-import net.jonathangiles.teenyhttpd.request.Request;
+import net.jonathangiles.tools.teenyhttpd.request.Method;
+import net.jonathangiles.tools.teenyhttpd.request.Request;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
 public class FileResponse extends Response {
-    static final File WEB_ROOT = new File("./wwwroot");
     static final String DEFAULT_FILE = "index.html";
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
+
+    private static final ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    private static final File DEFAULT_WEB_ROOT = Paths.get(loader.getResource("webroot").getPath()).toFile();
 
     private final StatusCode statusCode;
     private final List<String> headers;
@@ -83,7 +86,14 @@ public class FileResponse extends Response {
         }
     }
 
-    private File getFile(final String filename) {
-        return new File(WEB_ROOT, filename);
+    /**
+     * This method is called when the file is about to be loaded from the file system. Overriding it offers the
+     * opportunity of modifying where the file is retrieved from.
+     *
+     * @param filename The name of the file to be loaded, relative to the webroot (or otherwise).
+     * @return A File reference of the file being requested.
+     */
+    protected File getFile(final String filename) {
+        return new File(DEFAULT_WEB_ROOT, filename);
     }
 }

@@ -1,6 +1,6 @@
-package net.jonathangiles.teenyhttpd.request;
+package net.jonathangiles.tools.teenyhttpd.request;
 
-import net.jonathangiles.teenyhttpd.Header;
+import net.jonathangiles.tools.teenyhttpd.Header;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

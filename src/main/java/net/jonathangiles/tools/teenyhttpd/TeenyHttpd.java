@@ -1,13 +1,14 @@
-package net.jonathangiles.teenyhttpd;
+package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.teenyhttpd.request.Method;
-import net.jonathangiles.teenyhttpd.request.QueryParams;
-import net.jonathangiles.teenyhttpd.request.Request;
-import net.jonathangiles.teenyhttpd.response.FileResponse;
-import net.jonathangiles.teenyhttpd.response.Response;
+import net.jonathangiles.tools.teenyhttpd.request.Method;
+import net.jonathangiles.tools.teenyhttpd.request.QueryParams;
+import net.jonathangiles.tools.teenyhttpd.request.Request;
+import net.jonathangiles.tools.teenyhttpd.response.FileResponse;
+import net.jonathangiles.tools.teenyhttpd.response.Response;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -19,6 +20,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
+/**
+ * The TeenyHttpd server itself - instantiating an instance of this class and calling 'start()' is all that is required
+ * to begin serving requests.
+ */
 public class TeenyHttpd {
 
     private final int port;
@@ -27,16 +32,45 @@ public class TeenyHttpd {
     private ExecutorService executorService;
     private boolean isRunning = false;
 
+    private File webroot;
+
+    /**
+     * Creates a single-threaded server that will work on the given port, although the server does not start until
+     * 'stort()' is called.
+     *
+     * @param port The port for the server to listen to.
+     */
     public TeenyHttpd(final int port) {
         this(port, Executors::newSingleThreadExecutor);
     }
 
+    /**
+     * Creates a server that will work on the given port, although the server does not start until 'stort()' is called.
+     * The executor supplier enables creating {@link ExecutorService} instances that can handle requests with a range
+     * of different threading models.
+     *
+     * @param port The port for the server to listen to.
+     * @param executorSupplier A {@link ExecutorService} instances that can handle requests with a range
+     *      of different threading models.
+     */
     public TeenyHttpd(final int port, final Supplier<? extends ExecutorService> executorSupplier) {
         this.port = port;
         this.executorSupplier = executorSupplier;
     }
 
+    /**
+     * Sets the root directory to look for requested files.
+     * @param webroot A path on the local file system for serving requested files from.
+     */
+    public void setWebroot(final File webroot) {
+        this.webroot = webroot;
+    }
+
+    /**
+     * Starts the server instance.
+     */
     public void start() {
+        System.out.println("TeenyHttp server started.\nListening for connections on port : " + port + " ...\n");
         isRunning = true;
         executorService = executorSupplier.get();
 
@@ -50,13 +84,26 @@ public class TeenyHttpd {
         }
     }
 
+    /**
+     * Requests that the server instance stop serving requests.
+     */
     public void stop() {
         isRunning = false;
         executorService.shutdown();
     }
 
+    /**
+     * This method is called on every request, and allows for responses to be generated as appropriate.
+     *
+     * @param request The incoming request that must be responded to.
+     * @return The response that will be given to the requestor.
+     */
     public Response serve(final Request request) {
-        return new FileResponse(request);
+        return new FileResponse(request) {
+            @Override protected File getFile(final String filename) {
+                return new File(webroot, filename);
+            }
+        };
     }
 
     private void run(final Socket connect) {
