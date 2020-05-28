@@ -1,5 +1,9 @@
 package net.jonathangiles.tools.teenyhttpd.request;
 
+/**
+ * An enumeration listing all of the available request methods that are possible. Note that note all of these request
+ * methods are supported in TeenyHttpd today.
+ */
 public enum Method {
     OPTIONS,
     GET,

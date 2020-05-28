@@ -1,12 +1,13 @@
 package net.jonathangiles.tools.teenyhttpd.request;
 
-import net.jonathangiles.tools.teenyhttpd.Header;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Represents an incoming request.
+ */
 public class Request {
     private final Method method;
     private final String path;

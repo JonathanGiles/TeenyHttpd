@@ -1,5 +1,8 @@
-package net.jonathangiles.tools.teenyhttpd;
+package net.jonathangiles.tools.teenyhttpd.request;
 
+/**
+ * Represents a request header.
+ */
 public class Header {
     private final String keyValue;
     private String key;

@@ -2,6 +2,18 @@
 
 TeenyHttpd is an extremely basic HTTP server. It is implemented in plain Java 8 with no external dependencies, making it lightweight and applicable in situations where a basic, small HTTP server is all that is required.
 
+## Getting Started
+
+To make use of TeenyHttpd in your project, just add the following Maven dependency to your build:
+
+```xml
+<dependency>
+    <groupId>net.jonathangiles.tools</groupId>
+    <artifactId>teenyhttpd</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
 ## Examples
 
 ### Starting TeenyHttpd

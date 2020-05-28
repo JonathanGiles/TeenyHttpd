@@ -46,6 +46,13 @@ public class FileResponse extends Response {
                 }
                 break;
             }
+            case PUT:
+            case POST:
+            case OPTIONS:
+            case HEAD:
+            case TRACE:
+            case DELETE:
+            case CONNECT:
             default: {
                 fileToReturn = getFile(METHOD_NOT_SUPPORTED);
                 statusCode = StatusCode.NOT_IMPLEMENTED;

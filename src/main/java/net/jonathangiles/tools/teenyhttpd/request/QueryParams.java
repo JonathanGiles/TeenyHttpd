@@ -6,6 +6,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * A lazily-evaluated representation of all received query params from a single request. Query params are not parsed
+ * until they are requested by calling {@link #getQueryParams()}, which is never called by TeenyHttpd (either directly
+ * or through the {@link Request#getQueryParams()} method.
+ */
 public class QueryParams {
     public static final QueryParams EMPTY = new QueryParams("");
 
@@ -16,6 +21,9 @@ public class QueryParams {
         this.allParams = allParams;
     }
 
+    /**
+     * Returns all query params parsed into a Map.
+     */
     public Map<String, String> getQueryParams() {
         if (map == null) {
             if (allParams == null || allParams.isEmpty()) {
