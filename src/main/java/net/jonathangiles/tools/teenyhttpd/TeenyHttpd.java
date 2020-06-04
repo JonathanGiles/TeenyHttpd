@@ -108,10 +108,7 @@ public class TeenyHttpd {
     }
 
     private void run(final Socket connect) {
-        try (final BufferedReader in = new BufferedReader(new InputStreamReader(connect.getInputStream()));
-             final PrintWriter out = new PrintWriter(connect.getOutputStream());
-             final BufferedOutputStream dataOut = new BufferedOutputStream(connect.getOutputStream())) {
-
+        try (final BufferedReader in = new BufferedReader(new InputStreamReader(connect.getInputStream()))) {
             // get first line of the request from the client
             final String input = in.readLine();
             if (input == null) {
@@ -152,20 +149,27 @@ public class TeenyHttpd {
 
             final Response response = serve(request);
 
-            if (response != null) {
-                // write headers
-                out.println(response.getStatusCode().toString());
-                out.println("Server: TeenyHttpd from JonathanGiles.net : 1.0");
-                out.println("Date: " + LocalDateTime.now());
-                response.getHeaders().forEach(out::println);
-                out.println(); // empty line between header and body
-                out.flush();   // flush character output stream buffer
+            try (final PrintWriter out = new PrintWriter(connect.getOutputStream());
+                 final BufferedOutputStream dataOut = new BufferedOutputStream(connect.getOutputStream())) {
 
-                // write body
-                response.writeBody(dataOut);
+                if (response != null) {
+                    // write headers
+                    out.println(response.getStatusCode().toString());
+                    out.println("Server: TeenyHttpd from JonathanGiles.net : 1.0");
+                    out.println("Date: " + LocalDateTime.now());
+                    response.getHeaders().forEach(out::println);
+                    out.println(); // empty line between header and body
+                    out.flush();   // flush character output stream buffer
+
+                    // write body
+                    response.writeBody(dataOut);
+                }
+            } catch (IOException ioe) {
+                System.err.println("Server error when trying to serve request: " + request);
+                System.err.println("Server error : " + ioe);
             }
-        } catch (IOException ioe) {
-            System.err.println("Server error : " + ioe);
+        } catch (IOException e) {
+            System.err.println("Server error 2 : " + e);
         } finally {
             try {
                 connect.close();

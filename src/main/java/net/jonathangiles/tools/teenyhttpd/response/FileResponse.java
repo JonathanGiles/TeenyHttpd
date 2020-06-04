@@ -6,6 +6,8 @@ import net.jonathangiles.tools.teenyhttpd.request.Request;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.FileNameMap;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -18,6 +20,8 @@ public class FileResponse extends Response {
 
     private static final ClassLoader loader = Thread.currentThread().getContextClassLoader();
     private static final File DEFAULT_WEB_ROOT = Paths.get(loader.getResource("webroot").getPath()).toFile();
+
+    private static final FileNameMap FILE_NAME_MAP = URLConnection.getFileNameMap();
 
     private final StatusCode statusCode;
     private final List<String> headers;
@@ -85,12 +89,29 @@ public class FileResponse extends Response {
 
     // return supported MIME Types
     private String getContentType(final File file) {
-        final String filename = file.getName();
-        if (filename.endsWith(".htm") || filename.endsWith(".html")) {
-            return "text/html";
-        } else {
-            return "text/plain";
+        String contentType = FILE_NAME_MAP.getContentTypeFor(file.getName());
+        if (contentType != null) {
+            return contentType;
         }
+
+        final String ext = file.getName().substring(file.getName().lastIndexOf(".") + 1);
+
+        // TODO add support for more common MIME types:
+        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
+        switch (ext) {
+            case "css": return "text/css";
+
+            case "htm":
+            case "html": return "text/html";
+
+            case "js": return "text/javascript";
+            case "json": return "application/json";
+
+            case "ico": return "image/vnd.microsoft.icon";
+        }
+
+        System.err.println("Unable to determine content type for file " + file.getName());;
+        return "text/plain";
     }
 
     /**
