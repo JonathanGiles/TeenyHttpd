@@ -6,17 +6,34 @@ import net.jonathangiles.tools.teenyhttpd.request.Request;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.FileNameMap;
 import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 public class FileResponse extends Response {
     static final String DEFAULT_FILE = "index.html";
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
+
+    private static final Map<String, String> contentTypes;
+    static {
+        Properties props = new Properties();
+        try(InputStream resourceStream = FileResponse.class.getResourceAsStream("contentTypes.properties")) {
+            props.load(resourceStream);
+        } catch (IOException e) {
+            props = null;
+            e.printStackTrace();
+        }
+
+        contentTypes = props == null ? Collections.emptyMap() : (Map<String, String>) (Object) props;
+    }
 
     private static final ClassLoader loader = Thread.currentThread().getContextClassLoader();
     private static final File DEFAULT_WEB_ROOT = Paths.get(loader.getResource("webroot").getPath()).toFile();
@@ -89,25 +106,16 @@ public class FileResponse extends Response {
 
     // return supported MIME Types
     private String getContentType(final File file) {
-        String contentType = FILE_NAME_MAP.getContentTypeFor(file.getName());
+        final String ext = file.getName().substring(file.getName().lastIndexOf(".") + 1);
+
+        String contentType = contentTypes.get(ext);
         if (contentType != null) {
             return contentType;
         }
 
-        final String ext = file.getName().substring(file.getName().lastIndexOf(".") + 1);
-
-        // TODO add support for more common MIME types:
-        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
-        switch (ext) {
-            case "css": return "text/css";
-
-            case "htm":
-            case "html": return "text/html";
-
-            case "js": return "text/javascript";
-            case "json": return "application/json";
-
-            case "ico": return "image/vnd.microsoft.icon";
+        contentType = FILE_NAME_MAP.getContentTypeFor(file.getName());
+        if (contentType != null) {
+            return contentType;
         }
 
         System.err.println("Unable to determine content type for file " + file.getName());;

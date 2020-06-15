@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.jonathangiles.tools</groupId>
   <artifactId>teenyhttpd</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
 
   <name>TeenyHttpd</name>
   <description>TeenyHttpd is an extremely basic HTTP server.</description>
