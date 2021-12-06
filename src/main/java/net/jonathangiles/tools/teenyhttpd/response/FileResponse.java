@@ -36,7 +36,7 @@ public class FileResponse extends Response {
     }
 
     private static final ClassLoader loader = Thread.currentThread().getContextClassLoader();
-    private static final File DEFAULT_WEB_ROOT = Paths.get(loader.getResource("webroot").getPath()).toFile();
+    private static final File DEFAULT_WEB_ROOT = new File(loader.getResource("webroot").getFile());
 
     private static final FileNameMap FILE_NAME_MAP = URLConnection.getFileNameMap();
 
