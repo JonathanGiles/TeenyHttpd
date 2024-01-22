@@ -140,4 +140,4 @@ server.stop();
 
 ## Project Management
 
-Releases are performed using `mvn clean deploy -Prelease`._
+Releases are performed using `mvn clean deploy -Prelease`.
