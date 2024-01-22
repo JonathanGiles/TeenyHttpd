@@ -75,7 +75,7 @@ public class TeenyHttpdTest {
     @Test
     public void testGetStaticStringRouteRequest() throws Exception {
         server.addStringRoute("/", request -> "Hello world!");
-        HttpResponse response = executeRequest(Method.GET, "http://localhost");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT);
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Hello world!", EntityUtils.toString(response.getEntity()));
     }
@@ -85,11 +85,11 @@ public class TeenyHttpdTest {
         server.addStringRoute("/hello", request -> "Hello world!");
         server.addStringRoute("/goodbye", request -> "Goodbye world!");
 
-        HttpResponse responseHello = executeRequest(Method.GET, "http://localhost/hello");
+        HttpResponse responseHello = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/hello");
         assertEquals(200, responseHello.getStatusLine().getStatusCode());
         assertEquals("Hello world!", EntityUtils.toString(responseHello.getEntity()));
 
-        HttpResponse responseGoodBye = executeRequest(Method.GET, "http://localhost/goodbye");
+        HttpResponse responseGoodBye = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/goodbye");
         assertEquals(200, responseGoodBye.getStatusLine().getStatusCode());
         assertEquals("Goodbye world!", EntityUtils.toString(responseGoodBye.getEntity()));
     }
@@ -101,7 +101,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user/123");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/123");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("User ID: 123", EntityUtils.toString(response.getEntity()));
@@ -115,7 +115,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id + ", Name: " + name);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user/123/john");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/123/john");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("User ID: 123, Name: john", EntityUtils.toString(response.getEntity()));
@@ -128,7 +128,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search?query=test");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=test");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Search Query: test", EntityUtils.toString(response.getEntity()));
@@ -142,7 +142,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query + ", Sort: " + sort);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search?query=test&sort=desc");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=test&sort=desc");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Search Query: test, Sort: desc", EntityUtils.toString(response.getEntity()));
@@ -155,7 +155,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user");
 
         assertEquals(404, response.getStatusLine().getStatusCode());
     }
@@ -167,7 +167,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user/");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertTrue(EntityUtils.toString(response.getEntity()).contains("User ID: "));
@@ -180,7 +180,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertTrue(EntityUtils.toString(response.getEntity()).contains("Search Query: null"));
@@ -193,7 +193,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search?query=");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertTrue(EntityUtils.toString(response.getEntity()).contains("Search Query: "));
@@ -206,7 +206,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user/john%20doe");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/john%20doe");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("User ID: john doe", EntityUtils.toString(response.getEntity()));
@@ -219,7 +219,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user/john%2Fdoe");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/john%2Fdoe");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("User ID: john/doe", EntityUtils.toString(response.getEntity()));
@@ -232,7 +232,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search?query=java%20script");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=java%20script");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Search Query: java script", EntityUtils.toString(response.getEntity()));
@@ -245,7 +245,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search?query=java%2Fscript");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=java%2Fscript");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Search Query: java/script", EntityUtils.toString(response.getEntity()));
@@ -258,7 +258,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "User ID: " + id);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/user/()()()");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/()()()");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("User ID: ()()()", EntityUtils.toString(response.getEntity()));
@@ -271,7 +271,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Search Query: " + query);
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/search?query=()()()");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=()()()");
 
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Search Query: ()()()", EntityUtils.toString(response.getEntity()));
@@ -281,7 +281,7 @@ public class TeenyHttpdTest {
     public void testPostRequest() throws Exception {
         server.addRoute(Method.POST, "/post", request -> new StringResponse(StatusCode.OK, "Post request received"));
 
-        HttpPost postRequest = new HttpPost("http://localhost/post");
+        HttpPost postRequest = new HttpPost("http://localhost:" + TEST_PORT + "/post");
         postRequest.setEntity(new StringEntity("test"));
         HttpResponse response = httpClient.execute(postRequest);
 
@@ -293,7 +293,7 @@ public class TeenyHttpdTest {
     public void testPutRequest() throws Exception {
         server.addRoute(Method.PUT,"/put", request -> new StringResponse(StatusCode.OK, "Put request received"));
 
-        HttpPut putRequest = new HttpPut("http://localhost/put");
+        HttpPut putRequest = new HttpPut("http://localhost:" + TEST_PORT + "/put");
         putRequest.setEntity(new StringEntity("test"));
         HttpResponse response = httpClient.execute(putRequest);
 
@@ -305,7 +305,7 @@ public class TeenyHttpdTest {
     public void testDeleteRequest() throws Exception {
         server.addRoute(Method.DELETE, "/delete", request -> new StringResponse(StatusCode.OK, "Delete request received"));
 
-        HttpDelete deleteRequest = new HttpDelete("http://localhost/delete");
+        HttpDelete deleteRequest = new HttpDelete("http://localhost:" + TEST_PORT + "/delete");
         HttpResponse response = httpClient.execute(deleteRequest);
 
         assertEquals(200, response.getStatusLine().getStatusCode());
@@ -316,7 +316,7 @@ public class TeenyHttpdTest {
     public void testHeadRequest() throws Exception {
         server.addRoute(Method.HEAD, "/head", request -> new StringResponse(StatusCode.OK, "Head request received"));
 
-        HttpHead headRequest = new HttpHead("http://localhost/head");
+        HttpHead headRequest = new HttpHead("http://localhost:" + TEST_PORT + "/head");
         HttpResponse response = httpClient.execute(headRequest);
 
         assertEquals(200, response.getStatusLine().getStatusCode());
@@ -331,7 +331,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Post request received with ID: " + id + " and content: " + content);
         });
 
-        HttpPost postRequest = new HttpPost("http://localhost/post/123?content=test");
+        HttpPost postRequest = new HttpPost("http://localhost:" + TEST_PORT + "/post/123?content=test");
         postRequest.setEntity(new StringEntity("test"));
         HttpResponse response = httpClient.execute(postRequest);
 
@@ -347,7 +347,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Put request received with ID: " + id + " and content: " + content);
         });
 
-        HttpPut putRequest = new HttpPut("http://localhost/put/123?content=test");
+        HttpPut putRequest = new HttpPut("http://localhost:" + TEST_PORT + "/put/123?content=test");
         putRequest.setEntity(new StringEntity("test"));
         HttpResponse response = httpClient.execute(putRequest);
 
@@ -363,7 +363,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Delete request received with ID: " + id + " and content: " + content);
         });
 
-        HttpDelete deleteRequest = new HttpDelete("http://localhost/delete/123?content=test");
+        HttpDelete deleteRequest = new HttpDelete("http://localhost:" + TEST_PORT + "/delete/123?content=test");
         HttpResponse response = httpClient.execute(deleteRequest);
 
         assertEquals(200, response.getStatusLine().getStatusCode());
@@ -378,7 +378,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Head request received with ID: " + id + " and content: " + content);
         });
 
-        HttpHead headRequest = new HttpHead("http://localhost/head/123?content=test");
+        HttpHead headRequest = new HttpHead("http://localhost:" + TEST_PORT + "/head/123?content=test");
         HttpResponse response = httpClient.execute(headRequest);
 
         assertEquals(200, response.getStatusLine().getStatusCode());
@@ -389,7 +389,7 @@ public class TeenyHttpdTest {
     public void testConcurrentRequests() throws Exception {
         server.addGetRoute("/user/:id", request -> StatusCode.OK.asResponse());
 
-        HttpGet request = new HttpGet("http://localhost/user/123");
+        HttpGet request = new HttpGet("http://localhost:" + TEST_PORT + "/user/123");
         CompletableFuture<HttpResponse> future1 = CompletableFuture.supplyAsync(() -> {
             try {
                 return httpClient.execute(request);
@@ -414,7 +414,7 @@ public class TeenyHttpdTest {
 
     @Test
     public void testNonExistentRouteReturns404() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/nonexistent");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/nonexistent");
         assertEquals(404, response.getStatusLine().getStatusCode());
     }
 
@@ -424,7 +424,7 @@ public class TeenyHttpdTest {
         server.addGetRoute("/test", request -> StatusCode.OK.asResponse());
 
         // Try to access the route with POST method
-        HttpPost postRequest = new HttpPost("http://localhost/test");
+        HttpPost postRequest = new HttpPost("http://localhost:" + TEST_PORT + "/test");
         postRequest.setEntity(new StringEntity("test"));
         HttpResponse response = httpClient.execute(postRequest);
 
@@ -442,7 +442,7 @@ public class TeenyHttpdTest {
             return new StringResponse(StatusCode.OK, "Query Params: " + request.getQueryParams());
         });
 
-        HttpResponse response = executeRequest(Method.GET, "http://localhost/QueryParams?test=123&test2=456");
+        HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/QueryParams?test=123&test2=456");
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Query Params: {test2=456, test=123}", EntityUtils.toString(response.getEntity()));
     }
