@@ -20,6 +20,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class TeenyHttpdTest {
 
+    private static final int TEST_PORT = 8080;
+
     private TeenyHttpd server;
 
     private CloseableHttpClient httpClient;
@@ -27,7 +29,7 @@ public class TeenyHttpdTest {
     @BeforeEach
     public void setup() {
         httpClient = HttpClients.createDefault();
-        server = new TeenyHttpd(80);
+        server = new TeenyHttpd(TEST_PORT);
         server.start();
     }
 
