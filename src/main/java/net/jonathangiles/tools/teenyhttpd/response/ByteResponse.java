@@ -7,25 +7,24 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
-public class ByteResponse extends Response {
+public class ByteResponse implements Response {
     final StatusCode statusCode;
     final List<String> headers;
     final byte[] body;
 
-    public ByteResponse(final Request request, final StatusCode statusCode) {
-        this(request, statusCode, Collections.emptyList());
+    public ByteResponse(final StatusCode statusCode) {
+        this(statusCode, Collections.emptyList());
     }
 
-    public ByteResponse(final Request request, final StatusCode statusCode, final List<String> headers) {
-        this(request, statusCode, headers, null);
+    public ByteResponse(final StatusCode statusCode, final List<String> headers) {
+        this(statusCode, headers, null);
     }
 
-    public ByteResponse(final Request request, final StatusCode statusCode, final byte[] body) {
-        this(request, statusCode, Collections.emptyList(), body);
+    public ByteResponse(final StatusCode statusCode, final byte[] body) {
+        this(statusCode, Collections.emptyList(), body);
     }
 
-    public ByteResponse(final Request request, final StatusCode statusCode, final List<String> headers, final byte[] body) {
-        super(request);
+    public ByteResponse(final StatusCode statusCode, final List<String> headers, final byte[] body) {
         this.statusCode = statusCode;
         this.headers = headers;
         this.body = body;
@@ -39,6 +38,11 @@ public class ByteResponse extends Response {
     @Override
     public List<String> getHeaders() {
         return headers;
+    }
+
+    @Override
+    public long getBodyLength() {
+        return body == null ? 0 : body.length;
     }
 
     @Override

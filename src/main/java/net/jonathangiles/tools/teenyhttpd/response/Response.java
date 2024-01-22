@@ -4,22 +4,21 @@ import net.jonathangiles.tools.teenyhttpd.request.Request;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
-public abstract class Response {
-    private final Request request;
+public interface Response {
 
-    protected Response(final Request request) {
-        this.request = request;
+    StatusCode getStatusCode();
+
+    default List<String> getHeaders() {
+        return Collections.emptyList();
     }
 
-    protected Request getRequest() {
-        return request;
+    default long getBodyLength() {
+        return 0;
     }
 
-    public abstract StatusCode getStatusCode();
+    void writeBody(BufferedOutputStream dataOut) throws IOException;
 
-    public abstract List<String> getHeaders();
-
-    public abstract void writeBody(BufferedOutputStream dataOut) throws IOException;
 }

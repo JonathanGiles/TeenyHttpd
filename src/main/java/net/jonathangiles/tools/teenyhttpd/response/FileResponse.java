@@ -1,5 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd.response;
 
+import net.jonathangiles.tools.teenyhttpd.TeenyHttpd;
 import net.jonathangiles.tools.teenyhttpd.request.Method;
 import net.jonathangiles.tools.teenyhttpd.request.Request;
 
@@ -17,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-public class FileResponse extends Response {
+public class FileResponse implements Response {
     static final String DEFAULT_FILE = "index.html";
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
@@ -35,8 +36,7 @@ public class FileResponse extends Response {
         contentTypes = props == null ? Collections.emptyMap() : (Map<String, String>) (Object) props;
     }
 
-    private static final ClassLoader loader = Thread.currentThread().getContextClassLoader();
-    private static final File DEFAULT_WEB_ROOT = new File(loader.getResource("webroot").getFile());
+
 
     private static final FileNameMap FILE_NAME_MAP = URLConnection.getFileNameMap();
 
@@ -45,10 +45,8 @@ public class FileResponse extends Response {
     private File fileToReturn;
 
     public FileResponse(final Request request) {
-        super(request);
-
-        final Method method = getRequest().getMethod();
-        String path = getRequest().getPath();
+        final Method method = request.getMethod();
+        String path = request.getPath();
 
         fileToReturn = null;
 
@@ -99,6 +97,11 @@ public class FileResponse extends Response {
     }
 
     @Override
+    public long getBodyLength() {
+        return fileToReturn.length();
+    }
+
+    @Override
     public void writeBody(final BufferedOutputStream dataOut) throws IOException {
         Files.copy(fileToReturn.toPath(), dataOut);
         dataOut.flush();
@@ -130,6 +133,6 @@ public class FileResponse extends Response {
      * @return A File reference of the file being requested.
      */
     protected File getFile(final String filename) {
-        return new File(DEFAULT_WEB_ROOT, filename);
+        return new File(TeenyHttpd.DEFAULT_WEB_ROOT, filename);
     }
 }

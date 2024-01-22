@@ -59,4 +59,8 @@ public enum StatusCode {
     public String toString() {
         return fullString;
     }
+
+    public Response asResponse() {
+        return new EmptyResponse(this);
+    }
 }

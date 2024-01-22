@@ -12,5 +12,6 @@ public enum Method {
     PUT,
     DELETE,
     TRACE,
+    PATCH,
     CONNECT;
 }

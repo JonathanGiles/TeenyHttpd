@@ -1,9 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd.request;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Represents an incoming request.
@@ -14,6 +11,8 @@ public class Request {
     private final QueryParams queryParams;
     private List<Header> headers;
     private Map<String, String> headersMap;
+
+    private Map<String, String> pathParams = new HashMap<>(); // FIXME: this is a hack
 
     public Request(final Method method, final String path, final QueryParams queryParams) {
         this.method = method;
@@ -58,5 +57,13 @@ public class Request {
                        ", queryParams=" + queryParams +
                        ", headers=" + headers +
                        '}';
+    }
+
+    public Map<String, String> getPathParams() {
+        return pathParams;
+    }
+
+    public void addPathParam(String name, String value) {
+        pathParams.put(name, value);
     }
 }
