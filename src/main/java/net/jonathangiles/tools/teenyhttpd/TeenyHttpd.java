@@ -21,6 +21,7 @@ import java.net.SocketException;
 import java.net.URLDecoder;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -55,7 +56,9 @@ public class TeenyHttpd {
 
     private ServerSocket serverSocket;
 
-    private boolean isRunning = false;
+    private volatile boolean isRunning = false;
+
+    private CountDownLatch startLatch;
 
     private final Map<Method, Map<RequestPath, Function<Request, Response>>> routes = new HashMap<>();
 
@@ -135,11 +138,16 @@ public class TeenyHttpd {
     public void start() {
         Thread serverThread = new Thread(this::startServer);
         serverThread.start();
+        try {
+            startLatch = new CountDownLatch(1);
+            startLatch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void startServer() {
         System.out.println("TeenyHttp server started.\nListening for connections on port : " + port);
-        isRunning = true;
         executorService = executorSupplier.get();
 
         try {
@@ -149,6 +157,8 @@ public class TeenyHttpd {
         }
 
         try {
+            isRunning = true;
+            startLatch.countDown();
             while (isRunning) {
                 final Socket clientSocket = serverSocket.accept();
                 executorService.execute(() -> handleIncomingRequest(clientSocket));
