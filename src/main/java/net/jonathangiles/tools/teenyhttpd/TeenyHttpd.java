@@ -206,7 +206,7 @@ public class TeenyHttpd {
             Map<RequestPath, Function<Request, Response>> methodRoutes = routes.get(method);
 
             // we get request-uri requested. For now we assume it is an absolute path
-            final String requestUri = parse.nextToken().toLowerCase();
+            final String requestUri = parse.nextToken();
 
             // split it at the query param, if it exists
             final Request request;
@@ -272,7 +272,10 @@ public class TeenyHttpd {
                 }
                 response = route.get().getValue().apply(request);
             } else {
-                response = StatusCode.NO_CONTENT.asResponse();
+                System.out.println("No route found for " + request.getPath() + " on method " + method);
+                System.out.println("Available routes are:");
+                methodRoutes.keySet().forEach(System.out::println);
+                response = StatusCode.NOT_FOUND.asResponse();
             }
 
             sendResponse(clientSocket, response);
@@ -406,6 +409,15 @@ public class TeenyHttpd {
         @Override
         public int hashCode() {
             return Objects.hash(path);
+        }
+
+        @Override
+        public String toString() {
+            return "RequestPath{" +
+                    "path='" + path + "'" +
+                    ", regexPattern=" + regexPattern +
+                    ", pathParams=" + pathParams +
+                    '}';
         }
     }
 }
