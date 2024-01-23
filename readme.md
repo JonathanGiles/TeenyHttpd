@@ -10,7 +10,7 @@ To make use of TeenyHttpd in your project, just add the following Maven dependen
 <dependency>
     <groupId>net.jonathangiles.tools</groupId>
     <artifactId>teenyhttpd</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
 </dependency>
 ```
 
