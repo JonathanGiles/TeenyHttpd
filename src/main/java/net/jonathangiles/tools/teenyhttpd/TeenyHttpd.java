@@ -33,10 +33,22 @@ import java.util.regex.Pattern;
  * to begin serving requests.
  */
 public class TeenyHttpd {
+    public static final File DEFAULT_WEB_ROOT;
+    static {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
 
-    public static final File DEFAULT_WEB_ROOT = new File(Thread.currentThread().getContextClassLoader().getResource("webroot").getFile());
+        // we firstly check for the existence of a webroot directory in the classpath, and if it exists, we use it
+        if (cl.getResource("webroot") != null) {
+            DEFAULT_WEB_ROOT = new File(cl.getResource("webroot").getFile());
+        } else {
+            // otherwise, we are running from the IDE or command line, so we use the current working directory as the
+            // web root
+            DEFAULT_WEB_ROOT = new File(".");
+        }
+    }
 
     private final int port;
+
     private final Supplier<? extends ExecutorService> executorSupplier;
 
     private ExecutorService executorService;
@@ -47,6 +59,14 @@ public class TeenyHttpd {
 
     private final Map<Method, Map<RequestPath, Function<Request, Response>>> routes = new HashMap<>();
 
+    /**
+     * Starts a new server instance on port 80, and serves requests from the current working directory.
+     */
+    public static void main(String... args) {
+        TeenyHttpd server = new TeenyHttpd(80);
+        server.addFileRoute("/", new File("."));
+        server.start();
+    }
 
     /**
      * Creates a single-threaded server that will work on the given port, although the server does not start until

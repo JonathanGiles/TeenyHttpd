@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.jonathangiles.tools</groupId>
   <artifactId>teenyhttpd</artifactId>
-  <version>1.0.4</version>
+  <version>1.0.5</version>
 
   <name>TeenyHttpd</name>
   <description>TeenyHttpd is an extremely basic HTTP server.</description>
@@ -75,6 +75,19 @@
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <addClasspath>true</addClasspath>
+              <mainClass>net.jonathangiles.tools.teenyhttpd.TeenyHttpd</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
@@ -152,5 +165,4 @@
       </build>
     </profile>
   </profiles>
-
 </project>

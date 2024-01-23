@@ -16,7 +16,18 @@ To make use of TeenyHttpd in your project, just add the following Maven dependen
 
 ## Examples
 
-### Starting TeenyHttpd
+### Serving Static Content
+
+If you already have content you want to serve, you can simply place the latest `teenyhttpd-x.y.z.jar` file in the same 
+directory as your content, and then run the following command:
+
+```bash
+java -jar teenyhttpd-x.y.z.jar
+```
+
+This will start a server on port 80, and will serve all content from the directory that the JAR file is located in.
+
+### Starting TeenyHttpd Programmatically
 
 You can start a new instance of TeenyHttpd using the following code:
 
