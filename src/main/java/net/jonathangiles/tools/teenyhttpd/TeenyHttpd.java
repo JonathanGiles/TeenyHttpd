@@ -272,7 +272,7 @@ public class TeenyHttpd {
                 }
                 response = route.get().getValue().apply(request);
             } else {
-                response = StatusCode.NOT_FOUND.asResponse();
+                response = StatusCode.NO_CONTENT.asResponse();
             }
 
             sendResponse(clientSocket, response);
