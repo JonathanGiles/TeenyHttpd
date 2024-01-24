@@ -83,7 +83,7 @@
           <archive>
             <manifest>
               <addClasspath>true</addClasspath>
-              <mainClass>net.jonathangiles.tools.teenyhttpd.TeenyHttpd</mainClass>
+              <mainClass>net.jonathangiles.tools.teenyhttpd.Main</mainClass>
             </manifest>
           </archive>
         </configuration>

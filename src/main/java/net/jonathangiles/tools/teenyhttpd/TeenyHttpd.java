@@ -63,15 +63,6 @@ public class TeenyHttpd {
     private final Map<Method, Map<RequestPath, Function<Request, Response>>> routes = new HashMap<>();
 
     /**
-     * Starts a new server instance on port 80, and serves requests from the current working directory.
-     */
-    public static void main(String... args) {
-        TeenyHttpd server = new TeenyHttpd(80);
-        server.addFileRoute("/", new File("."));
-        server.start();
-    }
-
-    /**
      * Creates a single-threaded server that will work on the given port, although the server does not start until
      * 'stort()' is called.
      *

@@ -25,21 +25,24 @@ directory as your content, and then run the following command:
 java -jar teenyhttpd-x.y.z.jar
 ```
 
-This will start a server on port 80, and will serve all content from the directory that the JAR file is located in.
+This will start a server on port 80, and will serve all content from the directory that the JAR file is located in. 
+There is a `--help` parameter that will give some useful guidance on how to customize the server, which is shown below:
 
-### Starting TeenyHttpd Programmatically
+``` 
+Usage: java -jar teenyhttpd.jar [options]
 
-You can start a new instance of TeenyHttpd using the following code:
-
-```java
-final int PORT = 80;
-TeenyHttpd server = new TeenyHttpd(PORT);
-server.start();
+Options:
+  --port=80
+      The port to run the server on
+  --dir=.
+      The root directory to serve files from
+  --path=/
+      The path to serve files from (e.g. '/blah' for http://localhost/blah
+  -h, --help
+      Print this help message and exit
 ```
 
-Of course, starting an HTTP server with no routes defined is hardly interesting! TeenyHttpd supports serving files from a webroot directory, and also supports programmatically defining paths to serve.
-
-### Serving Files from a Webroot
+### Programmatically Serving Files from a Webroot
 
 By default, with the configuration below, TeenyHttpd will serve files from within the `/src/main/resources/webroot` 
 directory, and they will be accessible from the root path (for example, a GET request for `http://localhost/index.html` will look in the root of the `webroot` directory for an `index.html` file):
