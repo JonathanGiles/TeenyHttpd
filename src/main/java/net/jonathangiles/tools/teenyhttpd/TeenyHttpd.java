@@ -98,10 +98,6 @@ public class TeenyHttpd {
         _addRoute(Method.GET, path, request -> new StringResponse(handler.apply(request)));
     }
 
-    public void addFileRoute(String path) {
-        addFileRoute(path, DEFAULT_WEB_ROOT);
-    }
-
     public void addFileRoute(String path, final File webroot) {
         if (path == null) {
             path = "/";
