@@ -39,19 +39,6 @@ import java.util.regex.Pattern;
  * to begin serving requests.
  */
 public class TeenyHttpd {
-    public static final File DEFAULT_WEB_ROOT;
-    static {
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
-
-        // we firstly check for the existence of a webroot directory in the classpath, and if it exists, we use it
-        if (cl.getResource("webroot") != null) {
-            DEFAULT_WEB_ROOT = new File(cl.getResource("webroot").getFile());
-        } else {
-            // otherwise, we are running from the IDE or command line, so we use the current working directory as the
-            // web root
-            DEFAULT_WEB_ROOT = new File(".");
-        }
-    }
 
     private final int port;
 
@@ -76,7 +63,7 @@ public class TeenyHttpd {
 
     /**
      * Creates a single-threaded server that will work on the given port, although the server does not start until
-     * 'stort()' is called.
+     * 'start()' is called.
      *
      * @param port The port for the server to listen to.
      */
@@ -85,7 +72,7 @@ public class TeenyHttpd {
     }
 
     /**
-     * Creates a server that will work on the given port, although the server does not start until 'stort()' is called.
+     * Creates a server that will work on the given port, although the server does not start until 'start()' is called.
      * The executor supplier enables creating {@link ExecutorService} instances that can handle requests with a range
      * of different threading models.
      *
