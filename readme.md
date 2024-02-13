@@ -1,5 +1,10 @@
 # TeenyHttpd
 
+![Maven Central Version](https://img.shields.io/maven-central/v/net.jonathangiles.tools/teenyhttpd?color=blue) 
+![GitHub reposize](https://img.shields.io/github/repo-size/JonathanGiles/TeenyHttpd?color=blue) 
+![GitHub License](https://img.shields.io/github/license/JonathanGiles/TeenyHttpd?color=blue)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/JonathanGiles/TeenyHttpd/main.yml?color=blue)
+
 TeenyHttpd is an extremely basic HTTP server. It is implemented in plain Java 8 with no runtime dependencies, making it lightweight and applicable in situations where a basic, small HTTP server is all that is required.
 
 ## Getting Started
