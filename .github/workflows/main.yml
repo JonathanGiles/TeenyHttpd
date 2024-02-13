@@ -33,3 +33,11 @@ jobs:
           path: target/surefire-reports/*.xml
           reporter: java-junit
           fail-on-error: true
+
+      - name: Upload to Azure Blob Storage
+        uses: bacongobbler/azure-blob-storage-upload@v3.0.0
+        with:
+          source_dir: 'target/apidocs'
+          container_name: '$web'
+          connection_string: ${{ secrets.AZURE_BLOB_STORAGE_CONNECTION_STRING }}
+          sync: 'true'
