@@ -220,3 +220,72 @@ server.stop();
 ## Project Management
 
 Releases are performed using `mvn clean deploy -Prelease`.
+
+---
+
+### Winter ❄️
+
+Winter makes it easy to create stand-alone, non-production-grade teeny based applications.
+
+```java
+ Winter.bootstrap()
+    .add(new StoreController())
+        .start();
+```
+
+```java
+@Path("/store")
+public class StoreController {
+
+    @Get("/product/{id}")
+    public ResponseEntity<Product> getProduct(@PathVariable("id") int id) {
+        for (Product product : productList) {
+            if (product.getId() == id) {
+                return ResponseEntity.ok(product);
+            }
+        }
+
+        return ResponseEntity.notFound();
+    }
+}
+```
+
+Yes it looks like is spring, but its winter.
+
+---
+
+### Teeny JSON
+
+A teeny json library. easy. simple. teeny.
+
+```java
+    @JsonIncludeNonNull
+    class ExampleDto {
+        private String value;
+
+        @JsonAlias("alias")
+        public String getValue() {
+            return value;
+        }
+    }
+```
+Write it:
+
+```java
+TeenyJson.write(new ExampleDto("teeny"));
+```
+result:
+
+```json
+{
+  "alias": "teeny"
+}
+```
+
+Read it:
+
+```java
+ExampleDto dto = TeenyJson.read("{\"alias\":\"teeny\"}", ExampleDto.class);
+```
+
+> Note: doesn't support nested objects. collections a work in progress.
