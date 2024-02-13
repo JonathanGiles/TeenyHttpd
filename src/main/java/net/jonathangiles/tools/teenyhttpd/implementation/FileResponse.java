@@ -1,47 +1,26 @@
-package net.jonathangiles.tools.teenyhttpd.response;
+package net.jonathangiles.tools.teenyhttpd.implementation;
 
 import net.jonathangiles.tools.teenyhttpd.TeenyHttpd;
-import net.jonathangiles.tools.teenyhttpd.request.Method;
-import net.jonathangiles.tools.teenyhttpd.request.Request;
+import net.jonathangiles.tools.teenyhttpd.model.ContentType;
+import net.jonathangiles.tools.teenyhttpd.model.Headers;
+import net.jonathangiles.tools.teenyhttpd.model.Method;
+import net.jonathangiles.tools.teenyhttpd.model.Request;
+import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.FileNameMap;
 import java.net.URLConnection;
 import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 
-public class FileResponse implements Response {
+public class FileResponse extends ResponseBase {
     static final String DEFAULT_FILE = "index.html";
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
 
-    private static final Map<String, String> contentTypes;
-    static {
-        Properties props = new Properties();
-        try(InputStream resourceStream = FileResponse.class.getResourceAsStream("contentTypes.properties")) {
-            props.load(resourceStream);
-        } catch (IOException e) {
-            props = null;
-            e.printStackTrace();
-        }
-
-        contentTypes = props == null ? Collections.emptyMap() : (Map<String, String>) (Object) props;
-    }
-
-
-
     private static final FileNameMap FILE_NAME_MAP = URLConnection.getFileNameMap();
 
-    private final StatusCode statusCode;
-    private final List<String> headers;
     private File fileToReturn;
 
     public FileResponse(final Request request) {
@@ -59,9 +38,9 @@ public class FileResponse implements Response {
                 fileToReturn = getFile(path);
                 if (!fileToReturn.exists()) {
                     fileToReturn = getFile(FILE_NOT_FOUND);
-                    statusCode = StatusCode.NOT_FOUND;
+                    setStatusCode(StatusCode.NOT_FOUND);
                 } else {
-                    statusCode = StatusCode.OK;
+                    setStatusCode(StatusCode.OK);
                 }
                 break;
             }
@@ -74,26 +53,15 @@ public class FileResponse implements Response {
             case CONNECT:
             default: {
                 fileToReturn = getFile(METHOD_NOT_SUPPORTED);
-                statusCode = StatusCode.NOT_IMPLEMENTED;
+                setStatusCode(StatusCode.NOT_IMPLEMENTED);
                 break;
             }
         }
 
         final int fileLength = (int) fileToReturn.length();
 
-        headers = new ArrayList<>();
-        headers.add("Content-type: " + getContentType(fileToReturn));
-        headers.add("Content-length: " + fileLength);
-    }
-
-    @Override
-    public StatusCode getStatusCode() {
-        return statusCode;
-    }
-
-    @Override
-    public List<String> getHeaders() {
-        return headers;
+        setHeader(Headers.CONTENT_TYPE.asHeader(getContentType(fileToReturn)));
+        setHeader(Headers.CONTENT_LENGTH.asHeader(Integer.toString(fileLength)));
     }
 
     @Override
@@ -111,14 +79,14 @@ public class FileResponse implements Response {
     private String getContentType(final File file) {
         final String ext = file.getName().substring(file.getName().lastIndexOf(".") + 1);
 
-        String contentType = contentTypes.get(ext);
+        ContentType contentType = ContentType.fromFileExtension(ext);
         if (contentType != null) {
-            return contentType;
+            return contentType.getHeaderValue();
         }
 
-        contentType = FILE_NAME_MAP.getContentTypeFor(file.getName());
-        if (contentType != null) {
-            return contentType;
+        String contentTypeString = FILE_NAME_MAP.getContentTypeFor(file.getName());
+        if (contentTypeString != null) {
+            return contentTypeString;
         }
 
         System.err.println("Unable to determine content type for file " + file.getName());;

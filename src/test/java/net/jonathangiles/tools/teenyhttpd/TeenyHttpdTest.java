@@ -1,8 +1,9 @@
 package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.tools.teenyhttpd.request.Method;
-import net.jonathangiles.tools.teenyhttpd.response.StatusCode;
-import net.jonathangiles.tools.teenyhttpd.response.StringResponse;
+import net.jonathangiles.tools.teenyhttpd.model.Header;
+import net.jonathangiles.tools.teenyhttpd.model.Method;
+import net.jonathangiles.tools.teenyhttpd.model.Response;
+import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.*;
 import org.apache.http.entity.StringEntity;
@@ -14,13 +15,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class TeenyHttpdTest {
 
-    private static final int TEST_PORT = 8080;
+    private static final int TEST_PORT = 8081;
 
     private TeenyHttpd server;
 
@@ -98,7 +100,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithPathParam() throws Exception {
         server.addGetRoute("/user/:id", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/123");
@@ -112,7 +114,7 @@ public class TeenyHttpdTest {
         server.addGetRoute("/user/:id/:name", request -> {
             String id = request.getPathParams().get("id");
             String name = request.getPathParams().get("name");
-            return new StringResponse(StatusCode.OK, "User ID: " + id + ", Name: " + name);
+            return Response.create(StatusCode.OK, "User ID: " + id + ", Name: " + name);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/123/john");
@@ -125,7 +127,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithQueryParam() throws Exception {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query);
+            return Response.create(StatusCode.OK, "Search Query: " + query);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=test");
@@ -139,7 +141,7 @@ public class TeenyHttpdTest {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
             String sort = request.getQueryParams().get("sort");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query + ", Sort: " + sort);
+            return Response.create(StatusCode.OK, "Search Query: " + query + ", Sort: " + sort);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=test&sort=desc");
@@ -152,7 +154,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithNonexistentPathParam() throws Exception {
         server.addGetRoute("/user/:id", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user");
@@ -164,7 +166,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithEmptyPathParam() throws Exception {
         server.addGetRoute("/user/:id", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/");
@@ -177,7 +179,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithNonexistentQueryParam() throws Exception {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query);
+            return Response.create(StatusCode.OK, "Search Query: " + query);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search");
@@ -190,7 +192,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithEmptyQueryParam() throws Exception {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query);
+            return Response.create(StatusCode.OK, "Search Query: " + query);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=");
@@ -203,7 +205,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithSpecialCharactersInPathParam() throws Exception {
         server.addGetRoute("/user/:id", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/john%20doe");
@@ -216,7 +218,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithPathParamUrlEncoded() throws Exception {
         server.addGetRoute("/user/:id", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/john%2Fdoe");
@@ -229,7 +231,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithSpecialCharactersInQueryParam() throws Exception {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query);
+            return Response.create(StatusCode.OK, "Search Query: " + query);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=java%20script");
@@ -242,7 +244,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithQueryParamUrlEncoded() throws Exception {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query);
+            return Response.create(StatusCode.OK, "Search Query: " + query);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=java%2Fscript");
@@ -255,7 +257,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithNonAlphanumericPathParam() throws Exception {
         server.addGetRoute("/user/:id", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/user/()()()");
@@ -268,7 +270,7 @@ public class TeenyHttpdTest {
     public void testGetRequestWithNonAlphanumericQueryParam() throws Exception {
         server.addGetRoute("/search", request -> {
             String query = request.getQueryParams().get("query");
-            return new StringResponse(StatusCode.OK, "Search Query: " + query);
+            return Response.create(StatusCode.OK, "Search Query: " + query);
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/search?query=()()()");
@@ -279,7 +281,7 @@ public class TeenyHttpdTest {
 
     @Test
     public void testPostRequest() throws Exception {
-        server.addRoute(Method.POST, "/post", request -> new StringResponse(StatusCode.OK, "Post request received"));
+        server.addRoute(Method.POST, "/post", request -> Response.create(StatusCode.OK, "Post request received"));
 
         HttpPost postRequest = new HttpPost("http://localhost:" + TEST_PORT + "/post");
         postRequest.setEntity(new StringEntity("test"));
@@ -291,7 +293,7 @@ public class TeenyHttpdTest {
 
     @Test
     public void testPutRequest() throws Exception {
-        server.addRoute(Method.PUT,"/put", request -> new StringResponse(StatusCode.OK, "Put request received"));
+        server.addRoute(Method.PUT,"/put", request -> Response.create(StatusCode.OK, "Put request received"));
 
         HttpPut putRequest = new HttpPut("http://localhost:" + TEST_PORT + "/put");
         putRequest.setEntity(new StringEntity("test"));
@@ -303,7 +305,7 @@ public class TeenyHttpdTest {
 
     @Test
     public void testDeleteRequest() throws Exception {
-        server.addRoute(Method.DELETE, "/delete", request -> new StringResponse(StatusCode.OK, "Delete request received"));
+        server.addRoute(Method.DELETE, "/delete", request -> Response.create(StatusCode.OK, "Delete request received"));
 
         HttpDelete deleteRequest = new HttpDelete("http://localhost:" + TEST_PORT + "/delete");
         HttpResponse response = httpClient.execute(deleteRequest);
@@ -314,7 +316,7 @@ public class TeenyHttpdTest {
 
     @Test
     public void testHeadRequest() throws Exception {
-        server.addRoute(Method.HEAD, "/head", request -> new StringResponse(StatusCode.OK, "Head request received"));
+        server.addRoute(Method.HEAD, "/head", request -> Response.create(StatusCode.OK, "Head request received"));
 
         HttpHead headRequest = new HttpHead("http://localhost:" + TEST_PORT + "/head");
         HttpResponse response = httpClient.execute(headRequest);
@@ -328,7 +330,7 @@ public class TeenyHttpdTest {
         server.addRoute(Method.POST, "/post/:id", request -> {
             String id = request.getPathParams().get("id");
             String content = request.getQueryParams().get("content");
-            return new StringResponse(StatusCode.OK, "Post request received with ID: " + id + " and content: " + content);
+            return Response.create(StatusCode.OK, "Post request received with ID: " + id + " and content: " + content);
         });
 
         HttpPost postRequest = new HttpPost("http://localhost:" + TEST_PORT + "/post/123?content=test");
@@ -344,7 +346,7 @@ public class TeenyHttpdTest {
         server.addRoute(Method.PUT, "/put/:id", request -> {
             String id = request.getPathParams().get("id");
             String content = request.getQueryParams().get("content");
-            return new StringResponse(StatusCode.OK, "Put request received with ID: " + id + " and content: " + content);
+            return Response.create(StatusCode.OK, "Put request received with ID: " + id + " and content: " + content);
         });
 
         HttpPut putRequest = new HttpPut("http://localhost:" + TEST_PORT + "/put/123?content=test");
@@ -360,7 +362,7 @@ public class TeenyHttpdTest {
         server.addRoute(Method.DELETE, "/delete/:id", request -> {
             String id = request.getPathParams().get("id");
             String content = request.getQueryParams().get("content");
-            return new StringResponse(StatusCode.OK, "Delete request received with ID: " + id + " and content: " + content);
+            return Response.create(StatusCode.OK, "Delete request received with ID: " + id + " and content: " + content);
         });
 
         HttpDelete deleteRequest = new HttpDelete("http://localhost:" + TEST_PORT + "/delete/123?content=test");
@@ -375,7 +377,7 @@ public class TeenyHttpdTest {
         server.addRoute(Method.HEAD, "/head/:id", request -> {
             String id = request.getPathParams().get("id");
             String content = request.getQueryParams().get("content");
-            return new StringResponse(StatusCode.OK, "Head request received with ID: " + id + " and content: " + content);
+            return Response.create(StatusCode.OK, "Head request received with ID: " + id + " and content: " + content);
         });
 
         HttpHead headRequest = new HttpHead("http://localhost:" + TEST_PORT + "/head/123?content=test");
@@ -435,15 +437,70 @@ public class TeenyHttpdTest {
     public void testMultipleGetMethods() throws Exception {
         server.addGetRoute("/user/:id/details", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
         server.addGetRoute("/QueryParams", request -> {
             request.getQueryParams().forEach((key, value) -> System.out.println(key + " = " + value));
-            return new StringResponse(StatusCode.OK, "Query Params: " + request.getQueryParams());
+            return Response.create(StatusCode.OK, "Query Params: " + request.getQueryParams());
         });
 
         HttpResponse response = executeRequest(Method.GET, "http://localhost:" + TEST_PORT + "/QueryParams?test=123&test2=456");
         assertEquals(200, response.getStatusLine().getStatusCode());
         assertEquals("Query Params: {test2=456, test=123}", EntityUtils.toString(response.getEntity()));
     }
+
+    @Test
+    public void testSingleValueHeader() {
+        Header header = new Header("Content-Type: text/html");
+        assertEquals("Content-Type", header.getKey());
+        List<String> values = header.getValues();
+        assertEquals(1, values.size());
+        assertEquals("text/html", values.get(0));
+    }
+
+    @Test
+    public void testMultiValueHeader() {
+        Header header = new Header("Accept: text/html, application/xhtml+xml, application/xml");
+        assertEquals("Accept", header.getKey());
+        List<String> values = header.getValues();
+        assertEquals(3, values.size());
+        assertEquals("text/html", values.get(0));
+        assertEquals("application/xhtml+xml", values.get(1));
+        assertEquals("application/xml", values.get(2));
+    }
+
+
+    // ----------------------------
+    // Server-Sent Events
+    // ----------------------------
+//    @Test
+//    public void testSse() throws IOException {
+//        ServerSentEvent sse = new ServerSentEvent() {
+//            @Override
+//            public void onActive() {
+//                sendMessage("Test Message 1");
+//                sendMessage("Test Message 2");
+//                sendMessage("Test Message 3");
+////                close();
+//            }
+//
+//            @Override
+//            public void onInactive() {
+//
+//            }
+//        };
+//        server.addServerSentEventRoute("/events", sse);
+//
+//        List<String> messages = new ArrayList<>();
+//        HttpGet request = new HttpGet("http://localhost:" + TEST_PORT + "/events");
+//        HttpResponse response = httpClient.execute(request);
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+//        String line;
+//        while ((line = reader.readLine()) != null) {
+//            if (line.startsWith("data:")) {
+//                messages.add(line.substring(5).trim());
+//            }
+//        }
+//        assertEquals(Arrays.asList("Test Message 1", "Test Message 2", "Test Message 3"), messages);
+//    }
 }

@@ -116,7 +116,7 @@ the following code will serve a response of `User ID: 123` when a GET request is
 ```java
 server.addGetRoute("/user/:id/details", request -> {
     String id = request.getPathParams().get("id");
-    return new StringResponse(StatusCode.OK, "User ID: " + id);
+    return Response.create(StatusCode.OK, "User ID: " + id);
 });
 ```
 
@@ -138,6 +138,71 @@ For example, calling the route above with the `http://localhost/queryParams?test
 test = true
 foo = bar
 ```
+
+## Server-Sent Events
+
+TeenyHttpd supports Server-Sent Events (SSE). To use this feature, you need to use the `addServerSentEventRoute` method,
+with a `ServerSentEventHandler`. For example, the following code will send a message to the client every second:
+
+```java
+final int PORT = 80;
+TeenyHttpd server = new TeenyHttpd(PORT);
+server.addServerSentEventRoute("/events", ServerSentEventHandler.create(sse -> new Thread(() -> {
+    int i = 0;
+    while (sse.hasActiveConnections()) {
+        sse.sendMessage(new ServerSentEventMessage("Message " + i++, "counter"));
+        threadSleep(1000);
+    }
+}).start()));
+server.start();
+```
+
+If more than one user connects to the same /events topic, they will share the same state, each getting the same value 
+for `i` at the same time. If you want to customise the response per user (for example, based on a path parameter or
+query parameter), you can use the message generator feature:
+
+```java
+ServerSentEventHandler sse = ServerSentEventHandler.create((ServerSentEventHandler _sse) -> {
+    // start a thread and send messages to the client(s)
+    new Thread(() -> {
+        // all clients share the same integer value, but they get a custom message based
+        // on the path parameter for :username
+        AtomicInteger i = new AtomicInteger(0);
+
+        while (_sse.hasActiveConnections()) {
+            _sse.sendMessage(client -> {
+                String username = client.getPathParams().get("username");
+                return new ServerSentEventMessage("Hello " + username + " - " + i, "counter");
+            });
+            i.incrementAndGet();
+            threadSleep(1000);
+        }
+    }).start();
+});
+server.addServerSentEventRoute("/sse/:username", sse);
+```
+
+The above samples assume that you start a thread when there are active connections, to send messages to connected 
+clients at a regular interval. Another approach is to just have a ServerSentEventHandler that sends messages to
+connected clients when a message is received. For example, the following code will send a message to all clients 
+that are connected to the `/messages` topic, when a message is posted to `/message`:
+
+```java
+final int PORT = 80;
+TeenyHttpd server = new TeenyHttpd(PORT);
+ServerSentEventHandler chatMessagesEventHandler = ServerSentEventHandler.create();
+server.addServerSentEventRoute("/messages", chatMessagesEventHandler);
+server.addRoute(Method.POST, "/message", request -> {
+    String message = request.getQueryParams().get("message");
+    if (message != null && !message.isEmpty()) {
+        chatMessagesEventHandler.sendMessage(message);
+    }
+    return StatusCode.OK.asResponse();
+});
+```
+
+For a complete example, check out the [ChatServer](src/test/java/net/jonathangiles/tools/teenyhttpd/ChatServer.java) 
+demo application, that demonstrates how to use Server-Sent Events to create a simple chat server.
 
 ### Stopping TeenyHttpd
 

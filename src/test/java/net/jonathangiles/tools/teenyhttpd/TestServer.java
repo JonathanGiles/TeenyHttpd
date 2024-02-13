@@ -1,9 +1,11 @@
 package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.tools.teenyhttpd.response.StatusCode;
-import net.jonathangiles.tools.teenyhttpd.response.StringResponse;
+import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
+import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventMessage;
+import net.jonathangiles.tools.teenyhttpd.model.Response;
+import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
 
-import java.io.File;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestServer {
 
@@ -17,7 +19,7 @@ public class TestServer {
 
         server.addGetRoute("/user/:id/details", request -> {
             String id = request.getPathParams().get("id");
-            return new StringResponse(StatusCode.OK, "User ID: " + id);
+            return Response.create(StatusCode.OK, "User ID: " + id);
         });
 //
 //        server.addGetRoute("/foo/:bar/:baz", request -> {
@@ -31,8 +33,51 @@ public class TestServer {
             return StatusCode.OK.asResponse();
         });
 
+        final ServerSentEventHandler sse = ServerSentEventHandler.create((ServerSentEventHandler _sse) -> {
+            System.out.println("SSE active - sending messages to client(s)");
+
+            // start a thread and send messages to the client(s)
+            new Thread(() -> {
+                // all clients share the same integer value, but they get a custom message based
+                // on the path parameter for :username
+                AtomicInteger i = new AtomicInteger(0);
+
+                while (_sse.hasActiveConnections()) {
+                    _sse.sendMessage(client -> {
+                        String username = client.getPathParams().get("username");
+                        return new ServerSentEventMessage("Hello " + username + " - " + i, "counter");
+                    });
+                    i.incrementAndGet();
+//                        sendMessage(new ServerSentEventMessage("Message " + i++, "counter"));
+                    System.out.println(i);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        });
+        server.addServerSentEventRoute("/sse/:username", sse);
+
+        server.addServerSentEventRoute("/events", ServerSentEventHandler.create(simpleSse -> new Thread(() -> {
+            int i = 0;
+            while (simpleSse.hasActiveConnections()) {
+                simpleSse.sendMessage(new ServerSentEventMessage("Message " + i++, "counter"));
+                threadSleep(1000);
+            }
+        }).start()));
+
 //        server.addFileRoute("/");
 
         server.start();
+    }
+
+    private static void threadSleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }

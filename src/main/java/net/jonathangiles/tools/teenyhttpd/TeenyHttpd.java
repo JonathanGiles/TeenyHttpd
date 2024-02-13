@@ -1,13 +1,18 @@
 package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.tools.teenyhttpd.request.Header;
-import net.jonathangiles.tools.teenyhttpd.request.Method;
-import net.jonathangiles.tools.teenyhttpd.request.QueryParams;
-import net.jonathangiles.tools.teenyhttpd.request.Request;
-import net.jonathangiles.tools.teenyhttpd.response.FileResponse;
-import net.jonathangiles.tools.teenyhttpd.response.Response;
-import net.jonathangiles.tools.teenyhttpd.response.StatusCode;
-import net.jonathangiles.tools.teenyhttpd.response.StringResponse;
+import net.jonathangiles.tools.teenyhttpd.implementation.Main;
+import net.jonathangiles.tools.teenyhttpd.model.ContentType;
+import net.jonathangiles.tools.teenyhttpd.model.Header;
+import net.jonathangiles.tools.teenyhttpd.model.Headers;
+import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
+import net.jonathangiles.tools.teenyhttpd.implementation.ServerSentEventRequest;
+import net.jonathangiles.tools.teenyhttpd.model.Method;
+import net.jonathangiles.tools.teenyhttpd.model.QueryParams;
+import net.jonathangiles.tools.teenyhttpd.model.Request;
+import net.jonathangiles.tools.teenyhttpd.implementation.FileResponse;
+import net.jonathangiles.tools.teenyhttpd.model.Response;
+import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
+import net.jonathangiles.tools.teenyhttpd.implementation.StringResponse;
 
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
@@ -60,7 +65,14 @@ public class TeenyHttpd {
 
     private CountDownLatch startLatch;
 
-    private final Map<Method, Map<RequestPath, Function<Request, Response>>> routes = new HashMap<>();
+    private final Map<Method, List<Route>> routes = new HashMap<>();
+
+    /**
+     * Starts a new server instance.
+     */
+    public static void main(String... args) {
+        Main.main(args);
+    }
 
     /**
      * Creates a single-threaded server that will work on the given port, although the server does not start until
@@ -115,8 +127,26 @@ public class TeenyHttpd {
         });
     }
 
+    public void addServerSentEventRoute(String path, ServerSentEventHandler sse) {
+        Route sseRoute = new Route(Method.GET, new RequestPath(path), request -> {
+            Response response = StatusCode.OK.asResponse();
+            response.setHeader(Headers.CONTENT_TYPE.asHeader(ContentType.EVENT_STREAM.getHeaderValue()));
+            response.setHeader(Headers.CACHE_CONTROL.asHeader("no-cache"));
+            response.setHeader(Headers.CONNECTION.asHeader("keep-alive"));
+            response.setHeader(Headers.ACCESS_CONTROL_ALLOW_ORIGIN.asHeader("*"));
+            return response;
+        });
+        sseRoute.setServerSentEventRoute(true);
+        sseRoute.setSseHandler(sse);
+        _addRoute(sseRoute);
+    }
+
     private void _addRoute(final Method method, final String path, final Function<Request, Response> handler) {
-        routes.computeIfAbsent(method, k -> new HashMap<>()).put(new RequestPath(path), handler);
+        _addRoute(new Route(method, new RequestPath(path), handler));
+    }
+
+    private void _addRoute(final Route route) {
+        routes.computeIfAbsent(route.method, k -> new ArrayList<>()).add(route);
     }
 
     /**
@@ -185,7 +215,12 @@ public class TeenyHttpd {
     }
 
     private void handleIncomingRequest(final Socket clientSocket) {
-        try (final BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
+        boolean isLongRunningConnection = false;
+
+        BufferedReader in = null;
+        try {
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+
             // get first line of the request from the client
             final String input = in.readLine();
             if (input == null) {
@@ -200,20 +235,23 @@ public class TeenyHttpd {
             final Method method = Method.valueOf(parse.nextToken().toUpperCase());
 
             // Get the map for the method from the incoming request
-            Map<RequestPath, Function<Request, Response>> methodRoutes = routes.get(method);
+            List<Route> methodRoutes = routes.get(method);
 
             // we get request-uri requested. For now we assume it is an absolute path
             final String requestUri = parse.nextToken();
 
             // split it at the query param, if it exists
-            final Request request;
+            final String path;
+            final QueryParams queryParams;
             if (requestUri.contains("?")) {
                 final String[] uriSplit = requestUri.split("\\?", 2);
+                path = uriSplit[0];
 
                 // create a lazily-evaluated object to represent the query parameters
-                request = new Request(method, uriSplit[0], new QueryParams(uriSplit[1]));
+                queryParams = new QueryParams(uriSplit[1]);
             } else {
-                request = new Request(method, requestUri, QueryParams.EMPTY);
+                path = requestUri;
+                queryParams = QueryParams.EMPTY;
             }
 
             if (methodRoutes == null) {
@@ -221,8 +259,8 @@ public class TeenyHttpd {
                 // methods. We need to check if we support it on any other methods, and if so, we need to return a
                 // 405. If we don't support it on any other methods, we need to return a 404.
                 boolean isSupportedOnOtherMethods = routes.values().stream()
-                        .flatMap(m -> m.keySet().stream())
-                        .anyMatch(p -> p.getPath().equals(request.getPath()));
+                        .flatMap(Collection::stream)
+                        .anyMatch(p -> p.routePath.path.equals(path));
 
                 if (isSupportedOnOtherMethods) {
                     // we support this path on at least one other method, so we return a 405
@@ -237,50 +275,78 @@ public class TeenyHttpd {
             // read (but not parse) all request headers and put them into the request.
             // They will be parsed on-demand.
             String line;
+            List<Header> headers = new ArrayList<>();
             while (true) {
                 line = in.readLine();
                 if (line == null || line.isEmpty() || "\r\n".equals(line)) {
                     break;
                 }
-                request.addHeader(new Header(line));
+                headers.add(new Header(line));
             }
 
             // the request path is a full path, which may include path params within the path (e.g. ':id'), or extra path
             // information that comes after the root path (e.g. the root path may be '/', but we the path may be '/index.html').
             // We need to determine the best route to call based on the given full path, and then pass the request to that route.
-            Optional<Map.Entry<RequestPath, Function<Request, Response>>> route = methodRoutes.entrySet().stream()
-                .filter(entry -> {
+            Optional<Route> route = methodRoutes.stream()
+                .filter(r -> {
                     // compare the regex path to the request path, and check if they match
-                    return entry.getKey().getRegex().matcher(request.getPath()).matches();
+                    return r.routePath.getRegex().matcher(path).matches();
                 }).findFirst();
 
             final Response response;
+            Map<String, String> pathParamsMap = null;
             if (route.isPresent()) {
                 // we have a route, so we call it, but first we need to parse the path params and set them in the
                 // request
-                final RequestPath requestPath = route.get().getKey();
-                final Matcher matcher = requestPath.getRegex().matcher(request.getPath());
+                final RequestPath requestPath = route.get().routePath;
+                final Matcher matcher = requestPath.getRegex().matcher(path);
                 if (matcher.matches()) {
                     // we have a match, so we need to parse the path params and set them in the request
+                    pathParamsMap = new HashMap<>();
                     final List<String> pathParams = requestPath.getPathParams();
                     for (int i = 0; i < pathParams.size(); i++) {
-                        request.addPathParam(pathParams.get(i), URLDecoder.decode(matcher.group(i + 1), "UTF-8"));
+                        pathParamsMap.put(pathParams.get(i), URLDecoder.decode(matcher.group(i + 1), "UTF-8"));
                     }
                 }
-                response = route.get().getValue().apply(request);
-            } else {
-                System.out.println("No route found for " + request.getPath() + " on method " + method);
-                System.out.println("Available routes are:");
-                methodRoutes.keySet().forEach(System.out::println);
-                response = StatusCode.NOT_FOUND.asResponse();
-            }
 
-            sendResponse(clientSocket, response);
+                final Request request = Request.create(method, path, queryParams, headers, pathParamsMap);
+
+                // This is where we actually call the callback that the user has provided for the given route.
+                // Check if the response should be a streaming type based on the request headers
+                if (route.get().isServerSentEventRoute()) {
+                    // we have a request for a server-sent event, so we need to create a new ServerSentEvent instance
+                    // and pass the request
+                    isLongRunningConnection = true;
+                    ServerSentEventRequest sseRequest = new ServerSentEventRequest(request, clientSocket);
+
+                    // send the standard SSE-related headers first
+                    response = route.get().handler.apply(sseRequest);
+                    sendResponse(sseRequest.getWriter(), null, response.getStatusCode(), response);
+
+                    // now start the SSE connection
+                    route.get().getSseHandler().onConnect(sseRequest);
+                } else {
+                    // we have a normal request, so we call the route
+                    response = route.get().handler.apply(request);
+                    sendResponse(clientSocket, response);
+                }
+            } else {
+                System.out.println("No route found for " + path + " on method " + method);
+                System.out.println("  - Available routes are:");
+                methodRoutes.forEach(rp -> System.out.println("    - " + rp.routePath));
+                response = StatusCode.NOT_FOUND.asResponse();
+                sendResponse(clientSocket, response);
+            }
         } catch (IOException e) {
             System.err.println("Server error 2 : " + e);
         } finally {
             try {
-                clientSocket.close();
+                if (!isLongRunningConnection) {
+                    if (in != null) {
+                        in.close();
+                    }
+                    clientSocket.close();
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -298,22 +364,30 @@ public class TeenyHttpd {
     private void sendResponse(Socket clientSocket, StatusCode statusCode, Response response) {
         try (final PrintWriter out = new PrintWriter(clientSocket.getOutputStream());
              final BufferedOutputStream dataOut = new BufferedOutputStream(clientSocket.getOutputStream())) {
+            sendResponse(out, dataOut, statusCode, response);
+        } catch (IOException ioe) {
+            System.err.println("Server error when trying to serve request");
+            System.err.println("Server error : " + ioe);
+        }
+    }
 
-            // write headers
-            out.println((statusCode == null ? response.getStatusCode() : statusCode).toString());
-            out.println("Server: TeenyHttpd from JonathanGiles.net : 1.0");
-            out.println("Date: " + LocalDateTime.now());
+    private void sendResponse(PrintWriter out, BufferedOutputStream dataOut, StatusCode statusCode, Response response) {
+        try {
+            if (out != null) {
+                // write headers
+                out.println((statusCode == null ? response.getStatusCode() : statusCode).toString());
+                out.println("Server: TeenyHttpd from JonathanGiles.net : 1.0");
+                out.println("Date: " + LocalDateTime.now());
 
-            if (response != null) {
-                // FIXME shouldn't add two lots of Content-Length here
-                response.getHeaders().forEach(out::println);
-                out.println("Content-Length: " + response.getBodyLength());
+                if (response != null) {
+                    response.getHeaders().forEach(h -> out.println(h.toString()));
+                }
+
+                out.println(); // empty line between header and body
+                out.flush();   // flush character output stream buffer
             }
 
-            out.println(); // empty line between header and body
-            out.flush();   // flush character output stream buffer
-
-            if (response != null) {
+            if (response != null && dataOut != null) {
                 // write body
                 response.writeBody(dataOut);
                 dataOut.flush(); // flush binary output stream buffer
@@ -321,6 +395,37 @@ public class TeenyHttpd {
         } catch (IOException ioe) {
             System.err.println("Server error when trying to serve request");
             System.err.println("Server error : " + ioe);
+        }
+    }
+
+    private static class Route {
+        private final Method method;
+        private final RequestPath routePath;
+        private final Function<Request, Response> handler;
+        private boolean isServerSentEventRoute;
+
+        private ServerSentEventHandler sseHandler;
+
+        public Route(Method method, RequestPath routePath, Function<Request, Response> handler) {
+            this.method = method;
+            this.routePath = routePath;
+            this.handler = handler;
+        }
+
+        public boolean isServerSentEventRoute() {
+            return isServerSentEventRoute;
+        }
+
+        public void setServerSentEventRoute(boolean isServerSentEventRoute) {
+            this.isServerSentEventRoute = isServerSentEventRoute;
+        }
+
+        public ServerSentEventHandler getSseHandler() {
+            return sseHandler;
+        }
+
+        public void setSseHandler(ServerSentEventHandler sseHandler) {
+            this.sseHandler = sseHandler;
         }
     }
 

@@ -1,4 +1,6 @@
-package net.jonathangiles.tools.teenyhttpd.response;
+package net.jonathangiles.tools.teenyhttpd.model;
+
+import net.jonathangiles.tools.teenyhttpd.implementation.EmptyResponse;
 
 public enum StatusCode {
     // https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html

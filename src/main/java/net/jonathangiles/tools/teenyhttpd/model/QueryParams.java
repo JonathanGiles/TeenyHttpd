@@ -1,4 +1,4 @@
-package net.jonathangiles.tools.teenyhttpd.request;
+package net.jonathangiles.tools.teenyhttpd.model;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -19,6 +19,11 @@ public class QueryParams {
 
     public QueryParams(final String allParams) {
         this.allParams = allParams;
+    }
+
+    public QueryParams(final Map<String, String> queryParams) {
+        this.allParams = null;
+        this.map = queryParams;
     }
 
     /**

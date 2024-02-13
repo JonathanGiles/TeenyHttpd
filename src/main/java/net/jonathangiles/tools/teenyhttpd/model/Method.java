@@ -1,4 +1,4 @@
-package net.jonathangiles.tools.teenyhttpd.request;
+package net.jonathangiles.tools.teenyhttpd.model;
 
 /**
  * An enumeration listing all of the available request methods that are possible. Note that note all of these request

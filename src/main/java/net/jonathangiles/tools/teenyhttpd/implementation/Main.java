@@ -1,4 +1,6 @@
-package net.jonathangiles.tools.teenyhttpd;
+package net.jonathangiles.tools.teenyhttpd.implementation;
+
+import net.jonathangiles.tools.teenyhttpd.TeenyHttpd;
 
 import java.io.File;
 import java.util.List;
