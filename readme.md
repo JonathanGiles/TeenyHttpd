@@ -201,7 +201,7 @@ server.addRoute(Method.POST, "/message", request -> {
 });
 ```
 
-For a complete example, check out the [ChatServer](src/test/java/net/jonathangiles/tools/teenyhttpd/ChatServer.java) 
+For a complete example, check out the [ChatServer](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServer.java) 
 demo application, that demonstrates how to use Server-Sent Events to create a simple chat server.
 
 ### Stopping TeenyHttpd
