@@ -19,6 +19,10 @@ To make use of TeenyHttpd in your project, just add the following Maven dependen
 </dependency>
 ```
 
+## Documentation
+
+The TeenyHttpd JavaDoc for the current code in this repo is available [here](https://teenyhttpd.z22.web.core.windows.net/). This may be different than the JavaDoc for the most recent release.
+
 ## Examples
 
 ### Serving Static Content
