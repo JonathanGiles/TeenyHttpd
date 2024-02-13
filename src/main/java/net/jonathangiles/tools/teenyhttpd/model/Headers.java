@@ -21,4 +21,8 @@ public enum Headers {
     public Header asHeader(final String value) {
         return new Header(key, value);
     }
+
+    public Header asHeader(final Object value) {
+        return new Header(key, value.toString());
+    }
 }

@@ -52,9 +52,5 @@ public interface Response {
 
     void setHeader(Header header);
 
-    default long getBodyLength() {
-        return 0;
-    }
-
     void writeBody(BufferedOutputStream dataOut) throws IOException;
 }

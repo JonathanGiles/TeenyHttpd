@@ -8,6 +8,15 @@ import java.util.Scanner;
 import java.util.function.BiConsumer;
 
 public class Main {
+    private static final List<Command> commands = List.of(
+            new Command("--port", "The port to run the server on", "80",
+                    (main, value) -> main.port = Integer.parseInt(value)),
+            new Command("--dir", "The root directory to serve files from", ".",
+                    (main, value) -> main.rootDirectory = value),
+            new Command("--path", "The path to serve files from (e.g. '/blah' for http://localhost/blah", "/",
+                    (main, value) -> main.path = value)
+    );
+
     int port;
     String rootDirectory;
     String path;
@@ -36,15 +45,6 @@ public class Main {
     }
 
     private void processArgs(String... args) {
-        List<Command> commands = List.of(
-                new Command("--port", "The port to run the server on", "80",
-                        (main, value) -> main.port = Integer.parseInt(value)),
-                new Command("--dir", "The root directory to serve files from", ".",
-                        (main, value) -> main.rootDirectory = value),
-                new Command("--path", "The path to serve files from (e.g. '/blah' for http://localhost/blah", "/",
-                        (main, value) -> main.path = value)
-        );
-
         // set all properties to their default values initially, and then overwrite if appropriate
         for (Command command : commands) {
             command.execute(this, command.defaultValue);

@@ -45,8 +45,4 @@ public abstract class ResponseBase implements Response {
         }
         headers.add(header);
     }
-
-    void setHeaders(List<Header> headers) {
-        this.headers = headers;
-    }
 }

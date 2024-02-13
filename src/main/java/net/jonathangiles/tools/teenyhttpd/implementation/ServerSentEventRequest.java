@@ -40,11 +40,6 @@ public class ServerSentEventRequest implements Request, Closeable {
         return request.getPath();
     }
 
-//    @Override
-//    public void addHeader(Header header) {
-//        request.addHeader(header);
-//    }
-
     @Override
     public Map<String, Header> getHeaders() {
         return request.getHeaders();
@@ -69,9 +64,4 @@ public class ServerSentEventRequest implements Request, Closeable {
     public Map<String, String> getPathParams() {
         return request.getPathParams();
     }
-
-//    @Override
-//    public void addPathParam(String name, String value) {
-//        request.addPathParam(name, value);
-//    }
 }
