@@ -8,14 +8,6 @@ import java.util.List;
 public class StringResponse extends ByteResponse {
     private static final byte[] EMPTY_BYTE_ARRAY = new byte[] { };
 
-//    public StringResponse(final StatusCode statusCode) {
-//        super(statusCode);
-//    }
-
-//    public StringResponse(final StatusCode statusCode, final List<Header> headers) {
-//        super(statusCode, headers);
-//    }
-
     public StringResponse(final String body) {
         this(StatusCode.OK, body);
     }

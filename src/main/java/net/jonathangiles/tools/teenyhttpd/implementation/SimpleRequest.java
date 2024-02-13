@@ -63,13 +63,6 @@ public class SimpleRequest implements Request {
         return path;
     }
 
-//    public void addHeader(final Header header) {
-//        if (headersMap == null) {
-//            headersMap = new LinkedHashMap<>();
-//        }
-//        headersMap.put(header.getKey(), header);
-//    }
-
     /**
      * Returns a read-only Map of headers.
      * @return
@@ -113,8 +106,4 @@ public class SimpleRequest implements Request {
     @Override public Map<String, String> getPathParams() {
         return pathParams == null ? Collections.emptyMap() : pathParams;
     }
-
-//    @Override public void addPathParam(String name, String value) {
-//        pathParams.put(name, value);
-//    }
 }

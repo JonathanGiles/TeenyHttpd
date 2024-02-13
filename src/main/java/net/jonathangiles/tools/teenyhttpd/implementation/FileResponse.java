@@ -61,12 +61,7 @@ public class FileResponse extends ResponseBase {
         final int fileLength = (int) fileToReturn.length();
 
         setHeader(Headers.CONTENT_TYPE.asHeader(getContentType(fileToReturn)));
-        setHeader(Headers.CONTENT_LENGTH.asHeader(Integer.toString(fileLength)));
-    }
-
-    @Override
-    public long getBodyLength() {
-        return fileToReturn.length();
+        setHeader(Headers.CONTENT_LENGTH.asHeader(fileLength));
     }
 
     @Override
