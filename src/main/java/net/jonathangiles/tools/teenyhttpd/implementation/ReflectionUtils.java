@@ -1,9 +1,9 @@
-package net.jonathangiles.tools.teenyhttpd.json;
+package net.jonathangiles.tools.teenyhttpd.implementation;
 
 import java.lang.reflect.*;
 import java.util.Arrays;
 
-final class ReflectionUtils {
+public final class ReflectionUtils {
 
     @SuppressWarnings("unchecked")
     public static <T> T newInstance(Class<T> clazz) {
@@ -23,15 +23,15 @@ final class ReflectionUtils {
         }
     }
 
-     static ParameterType getParameterType(Parameter parameter) {
+    public static ParameterType getParameterType(Parameter parameter) {
         return getParameterType(parameter.getParameterizedType());
     }
 
-     static ParameterType getParameterType(Field field) {
+    public static ParameterType getParameterType(Field field) {
         return getParameterType(field.getGenericType());
     }
 
-     static ParameterType getParameterType(Type type) {
+    public static ParameterType getParameterType(Type type) {
         if (type instanceof Class<?>) {
             return null;
         }

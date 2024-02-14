@@ -1,6 +1,6 @@
-package net.jonathangiles.tools.teenyhttpd.json;
+package net.jonathangiles.tools.teenyhttpd.implementation;
 
-final class ParameterType {
+public final class ParameterType {
 
     private final Class<?> type;
     private final Class<?> parentType;//nullable
