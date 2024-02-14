@@ -15,6 +15,20 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 
 public class FileResponse extends ResponseBase {
+    public static final File DEFAULT_WEB_ROOT;
+    static {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+
+        // we firstly check for the existence of a webroot directory in the classpath, and if it exists, we use it
+        if (cl.getResource("webroot") != null) {
+            DEFAULT_WEB_ROOT = new File(cl.getResource("webroot").getFile());
+        } else {
+            // otherwise, we are running from the IDE or command line, so we use the current working directory as the
+            // web root
+            DEFAULT_WEB_ROOT = new File(".");
+        }
+    }
+
     static final String DEFAULT_FILE = "index.html";
     static final String FILE_NOT_FOUND = "404.html";
     static final String METHOD_NOT_SUPPORTED = "not_supported.html";
@@ -96,6 +110,6 @@ public class FileResponse extends ResponseBase {
      * @return A File reference of the file being requested.
      */
     protected File getFile(final String filename) {
-        return new File(TeenyHttpd.DEFAULT_WEB_ROOT, filename);
+        return new File(DEFAULT_WEB_ROOT, filename);
     }
 }
