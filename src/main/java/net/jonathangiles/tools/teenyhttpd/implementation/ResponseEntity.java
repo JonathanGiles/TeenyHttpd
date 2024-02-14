@@ -1,23 +1,26 @@
-package net.jonathangiles.tools.teenyhttpd.winter;
+package net.jonathangiles.tools.teenyhttpd.implementation;
 
 
 import net.jonathangiles.tools.teenyhttpd.model.Header;
+import net.jonathangiles.tools.teenyhttpd.model.Response;
 import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
 
+import java.io.BufferedOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A simple class to represent a response entity, which contains a status code and a body.
+ * A generic response that is used to infer the response body type.
  */
-public class ResponseEntity<T> {
+public class ResponseEntity<T> implements Response {
 
-    private final StatusCode status;
+    private final StatusCode statusCode;
     private final T body;
     private List<Header> headers;
 
-    public ResponseEntity(StatusCode status, T body) {
-        this.status = status;
+    public ResponseEntity(StatusCode statusCode, T body) {
+        this.statusCode = statusCode;
         this.body = body;
         this.headers = new ArrayList<>();
     }
@@ -27,16 +30,28 @@ public class ResponseEntity<T> {
         return this;
     }
 
-    public StatusCode getStatus() {
-        return status;
-    }
-
     public T getBody() {
         return body;
     }
 
+    @Override
+    public StatusCode getStatusCode() {
+        return statusCode;
+    }
+
+    @Override
     public List<Header> getHeaders() {
         return headers;
+    }
+
+    @Override
+    public void setHeader(Header header) {
+        headers.add(header);
+    }
+
+    @Override
+    public void writeBody(BufferedOutputStream dataOut) throws IOException {
+
     }
 
     public static <T> ResponseEntity<T> ok(T body) {

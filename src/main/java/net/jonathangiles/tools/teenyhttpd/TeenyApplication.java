@@ -1,31 +1,27 @@
-package net.jonathangiles.tools.teenyhttpd.winter;
+package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.tools.teenyhttpd.TeenyHttpd;
-import net.jonathangiles.tools.teenyhttpd.winter.annot.*;
+import net.jonathangiles.tools.teenyhttpd.annotations.*;
+import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static net.jonathangiles.tools.teenyhttpd.model.Method.*;
 
-/**
- * Winter teeny-framework to bootstrap a teeny server and his controllers
- */
-public class Winter {
+public class TeenyApplication {
+    private static TeenyApplication instance;
 
-    private static Winter instance;
-
-    public static Winter bootstrap() {
+    public static TeenyApplication start() {
         if (instance == null) {
-            instance = new Winter();
+            instance = new TeenyApplication();
         }
+
+        instance._start();
 
         return instance;
     }
@@ -39,13 +35,19 @@ public class Winter {
 
     private final TeenyHttpd server;
     private final AtomicBoolean started = new AtomicBoolean(false);
+    private final Map<String, MessageConverter> messageConverterMap;
 
-    private Winter() {
+    private TeenyApplication() {
         server = new TeenyHttpd(Integer.parseInt(System.getProperty("server.port", "8080")));
+        this.messageConverterMap = new HashMap<>();
     }
 
+    public TeenyApplication registerMessageConverter(MessageConverter messageConverter) {
+        messageConverterMap.put(messageConverter.getContentType(), messageConverter);
+        return this;
+    }
 
-    public Winter add(Class<?> controller) {
+    public TeenyApplication register(Class<?> controller) {
 
         Objects.requireNonNull(controller, "Controller cannot be null");
 
@@ -62,10 +64,11 @@ public class Winter {
             }
         }
 
-        return this;
+        throw new IllegalArgumentException("Controller must have a default constructor");
     }
 
-    public Winter add(Object controller) {
+    @SuppressWarnings("UnusedReturnValue")
+    public TeenyApplication register(Object controller) {
         addController(controller);
         return this;
     }
@@ -82,15 +85,16 @@ public class Winter {
                     method.isAnnotationPresent(Post.class) ||
                     method.isAnnotationPresent(Delete.class) ||
                     method.isAnnotationPresent(Put.class) ||
-                    method.isAnnotationPresent(Patch.class)
-            ) {
+                    method.isAnnotationPresent(Patch.class)) {
+
                 addEndpoint(controller, method);
             }
         }
     }
 
     private void addEndpoint(Object controller, Method method) {
-        server.addRoute(getMethod(method), getRoute(controller, method), new EndpointHandler(method, controller));
+        server.addRoute(getMethod(method), getRoute(controller, method),
+                new EndpointHandler(method, controller, messageConverterMap));
     }
 
     private String getRoute(Object controller, Method method) {
@@ -120,10 +124,7 @@ public class Winter {
             path = method.getAnnotation(Patch.class).value();
         }
 
-        path = path.replaceAll("}", "")
-                .replaceAll("\\{", ":");
-
-        if (context.value() != null) {
+        if (context != null && context.value() != null) {
 
             if (path.startsWith("/")) {
                 path = context.value() + path;
@@ -133,8 +134,8 @@ public class Winter {
 
         }
 
-        Logger.getLogger(Winter.class.getName())
-                .log(Level.INFO, "Winter-route: " + path);
+        Logger.getLogger(TeenyApplication.class.getName())
+                .log(Level.INFO, "Teeny-route: " + path);
 
         return path;
     }
@@ -163,25 +164,24 @@ public class Winter {
         throw new IllegalArgumentException("Method not supported: " + method.getName());
     }
 
-    public synchronized void start() {
+    private synchronized void _start() {
+
         if (started.get()) {
-            throw new IllegalStateException("Server already started");
+            return;
         }
 
-        //spend more time doing this banner lol
         if (System.getProperty("banner", "true").equals("true")) {
-            System.out.println("          _       _            \n" +
-                    "         (_)     | |                .      .\n" +
-                    "__      ___ _ __ | |_ ___ _ __      _\\/  \\/_\n" +
-                    "\\ \\ /\\ / / | '_ \\| __/ _ \\ '__|      _\\/\\/_\n" +
-                    " \\ V  V /| | | | | ||  __/ |     _\\_\\_\\/\\/_/_/_\n" +
-                    "  \\_/\\_/ |_|_| |_|\\__\\___|_|      / /_/\\/\\_\\ \\\n" +
-                    "  version 1.0                        _/\\/\\_\n" +
-                    "                                     /\\  /\\\n" +
-                    "                                    '      '\n");
+            System.out.println(" _________  ______   ______   ___   __    __  __    \n" +
+                    "/________/\\/_____/\\ /_____/\\ /__/\\ /__/\\ /_/\\/_/\\   \n" +
+                    "\\__.::.__\\/\\::::_\\/_\\::::_\\/_\\::\\_\\\\  \\ \\\\ \\ \\ \\ \\  \n" +
+                    "   \\::\\ \\   \\:\\/___/\\\\:\\/___/\\\\:. `-\\  \\ \\\\:\\_\\ \\ \\ \n" +
+                    "    \\::\\ \\   \\::___\\/_\\::___\\/_\\:. _    \\ \\\\::::_\\/ \n" +
+                    "     \\::\\ \\   \\:\\____/\\\\:\\____/\\\\. \\`-\\  \\ \\ \\::\\ \\ \n" +
+                    "      \\__\\/    \\_____\\/ \\_____\\/ \\__\\/ \\__\\/  \\__\\/ \n" +
+                    "                                                    \n");
+            System.out.println("Version: 1.0.0");
         }
 
         server.start();
     }
-
 }

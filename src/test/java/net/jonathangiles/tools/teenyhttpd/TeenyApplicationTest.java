@@ -1,29 +1,40 @@
 package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.tools.teenyhttpd.json.TeenyJson;
+import com.google.gson.Gson;
+import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.Method;
-import net.jonathangiles.tools.teenyhttpd.winter.*;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.*;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.RepeatedTest;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
-public class WinterTest {
-
+public class TeenyApplicationTest {
 
     private static final int TEST_PORT = 8080;
-
     private CloseableHttpClient httpClient;
+
+    private static class GsonMessageConverter implements MessageConverter {
+
+        final Gson gson = new Gson();
+
+        @Override
+        public String getContentType() {
+            return "application/json";
+        }
+
+        @Override
+        public void write(Object value, BufferedOutputStream dataOut) throws IOException {
+            dataOut.write(gson.toJson(value).getBytes());
+        }
+    }
 
     @BeforeEach
     public void setup() {
@@ -32,14 +43,15 @@ public class WinterTest {
 
         httpClient = HttpClients.createDefault();
 
-        Winter.bootstrap()
-                .add(new StoreController())
-                .start();
+        TeenyApplication.start()
+                .registerMessageConverter(new GsonMessageConverter())
+                .register(new StoreController());
+
     }
 
     @AfterEach
     public void tearDown() {
-        Winter.stop();
+        TeenyApplication.stop();
 
         try {
             httpClient.close();
@@ -51,6 +63,8 @@ public class WinterTest {
     }
 
     private HttpResponse executeRequest(Method method, String url) {
+
+        String basePath = "http://localhost:" + TEST_PORT;
 
         url = basePath + url;
 
@@ -82,13 +96,17 @@ public class WinterTest {
         }
     }
 
-    final String basePath = "http://localhost:" + TEST_PORT;
 
     @RepeatedTest(10)
     void testGetStaticStringRouteRequest() throws Exception {
         HttpResponse response = executeRequest(Method.GET, "/store/products");
         assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("[{\"name\": \"Apple\", \"id\": 1, \"price\": 100}, {\"name\": \"Banana\", \"id\": 2, \"price\": 200}]", EntityUtils.toString(response.getEntity()));
+
+        String json = EntityUtils.toString(response.getEntity());
+
+        Product[] products = new Gson().fromJson(json, Product[].class);
+
+        assertEquals(2, products.length);
     }
 
 
@@ -96,7 +114,14 @@ public class WinterTest {
     void testGetProductById() throws Exception {
         HttpResponse response = executeRequest(Method.GET, "/store/product/1");
         assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("{\"name\": \"Apple\", \"id\": 1, \"price\": 100}", EntityUtils.toString(response.getEntity()));
+
+        String json = EntityUtils.toString(response.getEntity());
+
+        Product product = new Gson().fromJson(json, Product.class);
+
+        Assertions.assertEquals(1, product.getId());
+        Assertions.assertEquals("Apple", product.getName());
+        Assertions.assertEquals(100, product.getPrice());
     }
 
     @Test
@@ -118,9 +143,20 @@ public class WinterTest {
         assertEquals(200, response.getStatusLine().getStatusCode());
         String json = EntityUtils.toString(response.getEntity());
 
-        Pet pet = TeenyJson.read(json, Pet.class);
+        Pet pet = new Gson().fromJson(json, Pet.class);
 
         assertEquals(new Pet("Fluffy", 3, "Dog"), pet);
+    }
+
+    @Test
+    void testComplex2() throws Exception {
+        HttpResponse response = executeRequest(Method.GET, "/store/complex/Rocky?type=Cat");
+        assertEquals(200, response.getStatusLine().getStatusCode());
+        String json = EntityUtils.toString(response.getEntity());
+
+        Pet pet = new Gson().fromJson(json, Pet.class);
+
+        assertEquals(new Pet("Rocky", 21, "Cat"), pet);
     }
 
 }

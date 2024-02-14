@@ -1,4 +1,4 @@
-package net.jonathangiles.tools.teenyhttpd.winter.annot;
+package net.jonathangiles.tools.teenyhttpd.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

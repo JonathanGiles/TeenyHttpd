@@ -1,4 +1,4 @@
-package net.jonathangiles.tools.teenyhttpd.winter.annot;
+package net.jonathangiles.tools.teenyhttpd.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -6,8 +6,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface Path {
+@Target(ElementType.METHOD)
+public @interface Post {
 
-    String value() default "";
+    String value() default "/";
+    String produces() default "application/json";
 }

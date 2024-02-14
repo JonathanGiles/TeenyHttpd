@@ -1,7 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd;
 
-import net.jonathangiles.tools.teenyhttpd.winter.*;
-import net.jonathangiles.tools.teenyhttpd.winter.annot.*;
+import net.jonathangiles.tools.teenyhttpd.annotations.*;
+import net.jonathangiles.tools.teenyhttpd.implementation.ResponseEntity;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ public class StoreController {
         return productList;
     }
 
-    @Get("/product/{id}")
+    @Get("/product/:id")
     public ResponseEntity<Product> getProduct(@PathVariable("id") int id) {
 
         for (Product product : productList) {
@@ -51,9 +51,9 @@ public class StoreController {
         System.out.println("Hey!");
     }
 
-    @Get("/complex/{name}")
+    @Get("/complex/:name")
     public ResponseEntity<Pet> complexEndpoint(@PathVariable("name") String name,
-                                               @QueryParam("age") int age,
+                                               @QueryParam(value = "age", defaultValue = "21") int age,
                                                @QueryParam(value = "type", defaultValue = "Dog") String type) {
         return ResponseEntity.ok(new Pet(name, age, type));
     }
