@@ -5,7 +5,7 @@ import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter
 import net.jonathangiles.tools.teenyhttpd.implementation.EmptyResponse;
 import net.jonathangiles.tools.teenyhttpd.implementation.StringResponse;
 import net.jonathangiles.tools.teenyhttpd.model.*;
-import net.jonathangiles.tools.teenyhttpd.implementation.ResponseEntity;
+import net.jonathangiles.tools.teenyhttpd.model.TypedResponse;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -14,8 +14,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -26,18 +30,26 @@ final class EndpointHandler implements Function<Request, Response> {
     private final Method target;
     private final Object parent;
     private final Parameter[] parameters;
-    private final MessageConverter messageConverter;
+    private final MessageConverter defaultConverter;
+    private final Map<String, MessageConverter> converterMap;
     private String contentType;
 
-    EndpointHandler(final Method target, final Object parent, Map<String, MessageConverter> converterMap) {
+    EndpointHandler(final Method target, final Object controller, Map<String, MessageConverter> converterMap) {
         this.target = target;
-        this.parent = parent;
+        this.parent = controller;
         this.parameters = target.getParameters();
-        this.messageConverter = converterMap.getOrDefault(getContentType(), DefaultMessageConverter.INSTANCE);
+        this.converterMap = converterMap;
+        this.defaultConverter = converterMap.getOrDefault(getContentType(), DefaultMessageConverter.INSTANCE);
+
+        if (!target.trySetAccessible()) {
+            Logger.getLogger(EndpointHandler.class.getName())
+                    .info("Could not set method accessible");
+        }
     }
 
 
     private Object[] buildArguments(Request request) {
+
         if (parameters.length == 0) return null;
 
         Object[] args = new Object[parameters.length];
@@ -45,14 +57,16 @@ final class EndpointHandler implements Function<Request, Response> {
         for (int i = 0; i < parameters.length; i++) {
             Parameter parameter = parameters[i];
 
-            if (parameter.isAnnotationPresent(PathVariable.class)) {
-                String param = request.getPathParams().get(parameter.getAnnotation(PathVariable.class).value());
+            if (parameter.isAnnotationPresent(PathParam.class)) {
+                String param = request.getPathParams().get(parameter.getAnnotation(PathParam.class).value());
 
                 if (param == null || param.isEmpty()) {
-                    throw new IllegalArgumentException("Path parameter " + parameter.getAnnotation(PathVariable.class).value() + " is required");
+                    throw new IllegalArgumentException("Path parameter " + parameter.getAnnotation(PathParam.class).value() + " is required");
                 }
 
                 args[i] = parse(param, parameter.getType());
+
+                continue;
             }
 
             if (parameter.isAnnotationPresent(QueryParam.class)) {
@@ -64,28 +78,67 @@ final class EndpointHandler implements Function<Request, Response> {
                 if (param == null) {
 
                     if (queryParam.defaultValue().isEmpty() && queryParam.required()) {
-                        throw new IllegalArgumentException("Query parameter " + parameter.getAnnotation(QueryParam.class).value() + " is required");
+                        throw new BadRequestException("Query parameter " + parameter.getAnnotation(QueryParam.class).value() + " is required");
                     }
 
                     param = queryParam.defaultValue();
                 }
 
                 args[i] = parse(param, parameter.getType());
+
+                continue;
+            }
+
+            if (parameter.isAnnotationPresent(RequestHeader.class)) {
+
+                Header header = request.getHeaders()
+                        .get(parameter.getAnnotation(RequestHeader.class).value());
+
+                if (Header.class.isAssignableFrom(parameter.getType())) {
+                    args[i] = header;
+                    continue;
+                }
+
+                if (header == null || header.getValues().isEmpty()) {
+                    args[i] = parse(null, parameter.getType());
+                    continue;
+                }
+
+                args[i] = parse(header.getValues().get(0), parameter.getType());
+
+                continue;
+            }
+
+            if (Request.class.isAssignableFrom(parameter.getType())) {
+                args[i] = request;
             }
 
             if (parameter.isAnnotationPresent(RequestBody.class)) {
                 System.out.println("Not supported yet!");
-                return null;
             }
+
         }
 
+
         return args;
+    }
+
+    private static class BadRequestException extends RuntimeException {
+
+        public BadRequestException(String message) {
+            super(message);
+        }
+
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parse(String source, Class<?> type) {
 
         if (type == String.class) {
+
+            if (source == null) return null;
+            if (source.isEmpty()) return "";
+
             try {
                 return URLDecoder.decode(source, StandardCharsets.UTF_8.toString());
             } catch (Exception ex) {
@@ -157,10 +210,23 @@ final class EndpointHandler implements Function<Request, Response> {
         return contentType;
     }
 
+    private MessageConverter getMessageConverter(Request request) {
+
+        Optional<Header> opHeader = request.getHeader("Accept");
+
+        if (opHeader.isPresent()) {
+            return converterMap.getOrDefault(opHeader.get().getValues().get(0), defaultConverter);
+        }
+
+        return defaultConverter;
+    }
+
     @Override
     public Response apply(Request request) {
 
         try {
+
+            MessageConverter converter = getMessageConverter(request);
 
             Object result = invoke(buildArguments(request));
 
@@ -168,8 +234,8 @@ final class EndpointHandler implements Function<Request, Response> {
                 return new EmptyResponse(StatusCode.OK);
             }
 
-            if (result instanceof ResponseEntity<?>) {
-                return convert((ResponseEntity<?>) result);
+            if (result instanceof TypedResponse<?>) {
+                return convert((TypedResponse<?>) result, converter);
             }
 
             if (result instanceof Response) {
@@ -177,23 +243,35 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (result instanceof String) {
-                return new StringResponse(StatusCode.OK, (String) result);
+                return new StringResponse(StatusCode.OK, getHeaders(converter), (String) result);
             }
 
             if (result instanceof StatusCode) {
                 return new EmptyResponse((StatusCode) result);
             }
 
-            return convert(ResponseEntity.ok(result));
+            return convert(TypedResponse.ok(result), converter);
+        } catch (BadRequestException ex) {
+            return new StringResponse(StatusCode.BAD_REQUEST, ex.getMessage());
         } catch (Exception ex) {
+
+            Logger.getLogger(EndpointHandler.class.getName())
+                    .log(Level.SEVERE, null, ex);
+
             return new StringResponse(StatusCode.INTERNAL_SERVER_ERROR, ex.getMessage());
         }
 
     }
 
 
-    private Object invoke(Object... args) {
+    private List<Header> getHeaders(MessageConverter converter) {
+        List<Header> headers = new ArrayList<>();
+        headers.add(new Header("Content-Type", converter.getContentType()));
 
+        return headers;
+    }
+
+    private Object invoke(Object[] args) {
         if (Void.class.isAssignableFrom(target.getReturnType())) {
             return null;
         }
@@ -206,22 +284,27 @@ final class EndpointHandler implements Function<Request, Response> {
 
     }
 
-    private Response convert(ResponseEntity<?> response) {
+    private Response convert(TypedResponse<?> response, MessageConverter converter) {
 
-        if (response.getHeaders() == null) {
-            response.setHeader(new Header("Content-Type", messageConverter.getContentType()));
+        if (response.getHeaders() == null || response.getHeaders().isEmpty()) {
+            response.setHeader(new Header("Content-Type", converter.getContentType()));
         }
 
-        return new ResponseEntityDecorator(response, messageConverter);
+        return new TypedResponseDecorator(response, converter);
     }
 
-    private static class ResponseEntityDecorator implements Response {
-        private final ResponseEntity<?> response;
+    private static class TypedResponseDecorator implements Response {
+        private final TypedResponse<?> response;
         private final MessageConverter messageConverter;
 
-        public ResponseEntityDecorator(ResponseEntity<?> response, MessageConverter messageConverter) {
+        public TypedResponseDecorator(TypedResponse<?> response, MessageConverter messageConverter) {
             this.response = response;
             this.messageConverter = messageConverter;
+        }
+
+        @Override
+        public List<Header> getHeaders() {
+            return response.getHeaders();
         }
 
         @Override
@@ -236,7 +319,8 @@ final class EndpointHandler implements Function<Request, Response> {
 
         @Override
         public void writeBody(BufferedOutputStream dataOut) throws IOException {
-            messageConverter.write(response.getBody(), dataOut);
+            messageConverter.write(response.getValue(), dataOut);
+            dataOut.flush();
         }
     }
 }

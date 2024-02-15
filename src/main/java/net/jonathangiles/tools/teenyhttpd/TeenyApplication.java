@@ -1,11 +1,13 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
+import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -40,6 +42,7 @@ public class TeenyApplication {
     private TeenyApplication() {
         server = new TeenyHttpd(Integer.parseInt(System.getProperty("server.port", "8080")));
         this.messageConverterMap = new HashMap<>();
+        this.messageConverterMap.put(DefaultMessageConverter.INSTANCE.getContentType(), DefaultMessageConverter.INSTANCE);
     }
 
     public TeenyApplication registerMessageConverter(MessageConverter messageConverter) {
@@ -93,8 +96,46 @@ public class TeenyApplication {
     }
 
     private void addEndpoint(Object controller, Method method) {
+
+        validateMethod(controller, method);
+
         server.addRoute(getMethod(method), getRoute(controller, method),
                 new EndpointHandler(method, controller, messageConverterMap));
+    }
+
+    private void validateMethod(Object controller, Method method) {
+
+        String route = getRoute(controller, method);
+
+        if (route.contains("?")) {
+            throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Query parameters must be annotated with @QueryParam");
+        }
+
+        for (Parameter parameter : method.getParameters()) {
+            if (parameter.isAnnotationPresent(QueryParam.class)) {
+                QueryParam queryParam = parameter.getAnnotation(QueryParam.class);
+
+                if (queryParam.value().isEmpty()) {
+                    throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " QueryParam value cannot be empty");
+                }
+            }
+
+            if (parameter.isAnnotationPresent(RequestHeader.class)) {
+                RequestHeader requestHeader = parameter.getAnnotation(RequestHeader.class);
+
+                if (requestHeader.value().isEmpty()) {
+                    throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " RequestHeader value cannot be empty");
+                }
+            }
+
+            if (parameter.isAnnotationPresent(PathParam.class)) {
+                PathParam pathParam = parameter.getAnnotation(PathParam.class);
+
+                if (pathParam.value().isEmpty()) {
+                    throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " PathParam value cannot be empty");
+                }
+            }
+        }
     }
 
     private String getRoute(Object controller, Method method) {
@@ -106,23 +147,17 @@ public class TeenyApplication {
 
         if (method.isAnnotationPresent(Get.class)) {
             path = method.getAnnotation(Get.class).value();
-        }
-
-        if (method.isAnnotationPresent(Post.class)) {
+        } else if (method.isAnnotationPresent(Post.class)) {
             path = method.getAnnotation(Post.class).value();
-        }
-
-        if (method.isAnnotationPresent(Delete.class)) {
+        } else if (method.isAnnotationPresent(Delete.class)) {
             path = method.getAnnotation(Delete.class).value();
-        }
-
-        if (method.isAnnotationPresent(Put.class)) {
+        } else if (method.isAnnotationPresent(Put.class)) {
             path = method.getAnnotation(Put.class).value();
-        }
-
-        if (method.isAnnotationPresent(Patch.class)) {
+        } else if (method.isAnnotationPresent(Patch.class)) {
             path = method.getAnnotation(Patch.class).value();
         }
+
+        path = path.trim();
 
         if (context != null && context.value() != null) {
 
@@ -131,7 +166,6 @@ public class TeenyApplication {
             } else {
                 path = context.value() + "/" + path;
             }
-
         }
 
         Logger.getLogger(TeenyApplication.class.getName())

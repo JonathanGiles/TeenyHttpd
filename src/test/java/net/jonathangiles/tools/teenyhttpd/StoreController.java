@@ -1,11 +1,14 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
-import net.jonathangiles.tools.teenyhttpd.implementation.ResponseEntity;
+import net.jonathangiles.tools.teenyhttpd.model.Header;
+import net.jonathangiles.tools.teenyhttpd.model.Request;
+import net.jonathangiles.tools.teenyhttpd.model.TypedResponse;
 
 import java.util.List;
 import java.util.ArrayList;
 
+@SuppressWarnings("unused")
 @Path("/store")
 public class StoreController {
 
@@ -27,35 +30,67 @@ public class StoreController {
         return productList;
     }
 
+    @Get("/pet")
+    public Pet getPet() {
+        return new Pet("Bodoque", 21, "Dog");
+    }
+
     @Get("/product/:id")
-    public ResponseEntity<Product> getProduct(@PathVariable("id") int id) {
+    public TypedResponse<Product> getProduct(@PathParam("id") int id) {
 
         for (Product product : productList) {
             if (product.getId() == id) {
-                return ResponseEntity.ok(product);
+                return TypedResponse.ok(product);
             }
         }
 
-        return ResponseEntity.notFound();
+        return TypedResponse.notFound();
     }
 
     @Put("/product")
-    public ResponseEntity<String> createProduct(@RequestBody Product product) {
+    public TypedResponse<String> createProduct(@RequestBody Product product) {
         productList.add(product);
-        return ResponseEntity.ok("Product created");
+        return TypedResponse.ok("Product created");
     }
 
-
     @Get("/empty")
-    public void emptyController() {
+    private void empty() {
         System.out.println("Hey!");
     }
 
+    @Get("/header")
+    public TypedResponse<String> header(@RequestHeader("Authorization") String auth) {
+        return TypedResponse.ok(auth);
+    }
+
+    @Get("/header2")
+    public String header2(@RequestHeader("Authorization") Header header) {
+        return header.getValues().get(0);
+    }
+
+    @Get("/request")
+    public String request(Request request) {
+        return request.getClass().getSimpleName();
+    }
+
     @Get("/complex/:name")
-    public ResponseEntity<Pet> complexEndpoint(@PathVariable("name") String name,
-                                               @QueryParam(value = "age", defaultValue = "21") int age,
-                                               @QueryParam(value = "type", defaultValue = "Dog") String type) {
-        return ResponseEntity.ok(new Pet(name, age, type));
+    public TypedResponse<Pet> complexEndpoint(@PathParam("name") String name,
+                                              @RequestHeader("Authorization") String auth,
+                                              @QueryParam(value = "age", defaultValue = "21") int age,
+                                              @QueryParam(value = "type", defaultValue = "Dog") String type) {
+
+        return TypedResponse.ok(new Pet(name, age, type))
+                .header("Authorization", auth);
+    }
+
+    @Get("/requiredQueryParam")
+    public String requiredQueryParam(@QueryParam(value = "name", required = true) String name) {
+        return name;
+    }
+
+    @Get(value = "/contentType", produces = "application/x-protobuf")
+    public String contentType() {
+        return "test";
     }
 
 }
