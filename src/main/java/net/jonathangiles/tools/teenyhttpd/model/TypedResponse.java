@@ -2,26 +2,30 @@ package net.jonathangiles.tools.teenyhttpd.model;
 
 import net.jonathangiles.tools.teenyhttpd.implementation.TypedResponseImpl;
 
+import java.util.Objects;
+
 public interface TypedResponse<T> extends Response {
 
-    T getValue();
+    T getBody();
 
-    TypedResponse<T> header(String key, String value);
+    TypedResponse<T> setHeader(String key, String value);
+
+    TypedResponse<T> setBody(T header);
 
     static <T> TypedResponse<T> ok() {
         return new TypedResponseImpl<>(StatusCode.OK, null);
     }
 
     static <T> TypedResponse<T> ok(T value) {
-        return of(value, StatusCode.OK);
+        return create(StatusCode.OK, value);
     }
 
     static <T> TypedResponse<T> status(StatusCode statusCode) {
-        return of(null, statusCode);
+        return create(Objects.requireNonNull(statusCode), null);
     }
 
-    static <T> TypedResponse<T> of(T value, StatusCode statusCode) {
-        return new TypedResponseImpl<>(statusCode, value);
+    static <T> TypedResponse<T> create(StatusCode statusCode, T body) {
+        return new TypedResponseImpl<>(statusCode, body);
     }
 
     static <T> TypedResponse<T> noContent() {

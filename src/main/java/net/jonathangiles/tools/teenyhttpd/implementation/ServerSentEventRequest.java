@@ -41,6 +41,11 @@ public class ServerSentEventRequest implements Request, Closeable {
     }
 
     @Override
+    public String getBody() {
+        return null;
+    }
+
+    @Override
     public Map<String, Header> getHeaders() {
         return request.getHeaders();
     }

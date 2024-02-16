@@ -3,21 +3,26 @@ package net.jonathangiles.tools.teenyhttpd;
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
 import net.jonathangiles.tools.teenyhttpd.model.Header;
 import net.jonathangiles.tools.teenyhttpd.model.Request;
+import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
 import net.jonathangiles.tools.teenyhttpd.model.TypedResponse;
 
-import java.util.List;
-import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+import static net.jonathangiles.tools.teenyhttpd.model.StatusCode.CREATED;
+import static net.jonathangiles.tools.teenyhttpd.model.TypedResponse.ok;
 
 @SuppressWarnings("unused")
 @Path("/store")
 public class StoreController {
 
-    private final List<Product> productList;
+    private final Map<Integer, Product> productMap;
 
     public StoreController() {
-        productList = new ArrayList<>();
-        productList.add(new Product(1, "Apple", 100));
-        productList.add(new Product(2, "Banana", 200));
+        productMap = new HashMap<>();
+        productMap.put(1, new Product(1, "Apple", 100));
+        productMap.put(2, new Product(2, "Banana", 200));
     }
 
     @Get
@@ -26,8 +31,8 @@ public class StoreController {
     }
 
     @Get("/products")
-    public List<Product> get() {
-        return productList;
+    public Collection<Product> get() {
+        return productMap.values();
     }
 
     @Get("/pet")
@@ -38,19 +43,30 @@ public class StoreController {
     @Get("/product/:id")
     public TypedResponse<Product> getProduct(@PathParam("id") int id) {
 
-        for (Product product : productList) {
-            if (product.getId() == id) {
-                return TypedResponse.ok(product);
-            }
-        }
+        Product product = productMap.get(id);
+
+        if (product != null) return ok(product);
 
         return TypedResponse.notFound();
     }
 
     @Put("/product")
     public TypedResponse<String> createProduct(@RequestBody Product product) {
-        productList.add(product);
-        return TypedResponse.ok("Product created");
+        Product replaced = productMap.put(product.getId(), product);
+
+        if (replaced != null) return ok("Product updated");
+
+        return TypedResponse.create(CREATED, "Product created");
+    }
+
+    @Delete("/product/:id")
+    public TypedResponse<String> deleteProduct(@PathParam("id") int id) {
+
+        Product removed = productMap.remove(id);
+
+        if (removed != null) return ok();
+
+        return TypedResponse.status(StatusCode.NOT_FOUND);
     }
 
     @Get("/empty")
@@ -60,7 +76,7 @@ public class StoreController {
 
     @Get("/header")
     public TypedResponse<String> header(@RequestHeader("Authorization") String auth) {
-        return TypedResponse.ok(auth);
+        return ok(auth);
     }
 
     @Get("/header2")
@@ -79,8 +95,8 @@ public class StoreController {
                                               @QueryParam(value = "age", defaultValue = "21") int age,
                                               @QueryParam(value = "type", defaultValue = "Dog") String type) {
 
-        return TypedResponse.ok(new Pet(name, age, type))
-                .header("Authorization", auth);
+        return ok(new Pet(name, age, type))
+                .setHeader("Authorization", auth);
     }
 
     @Get("/requiredQueryParam")
@@ -91,6 +107,16 @@ public class StoreController {
     @Get(value = "/contentType", produces = "application/x-protobuf")
     public String contentType() {
         return "test";
+    }
+
+    @Get("/statusCode")
+    public StatusCode statusCode() {
+        return StatusCode.FORBIDDEN;
+    }
+
+    @Post("/requestBody")
+    public String requestBody(@RequestBody String body) {
+        return body + " Handled!";
     }
 
 }

@@ -29,10 +29,9 @@ public class TeenyApplication {
     }
 
     public static void stop() {
-        if (instance != null) {
-            instance.server.stop();
-            instance.started.set(false);
-        }
+        if (instance == null) return;
+
+        instance._stop();
     }
 
     private final TeenyHttpd server;
@@ -111,7 +110,14 @@ public class TeenyApplication {
             throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Query parameters must be annotated with @QueryParam");
         }
 
+        int bodyCount = 0;
+
         for (Parameter parameter : method.getParameters()) {
+
+            if (parameter.isAnnotationPresent(RequestBody.class)) {
+                bodyCount++;
+            }
+
             if (parameter.isAnnotationPresent(QueryParam.class)) {
                 QueryParam queryParam = parameter.getAnnotation(QueryParam.class);
 
@@ -135,6 +141,10 @@ public class TeenyApplication {
                     throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " PathParam value cannot be empty");
                 }
             }
+        }
+
+        if (bodyCount > 1) {
+            throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Only one parameter can be annotated with @RequestBody");
         }
     }
 
@@ -168,23 +178,21 @@ public class TeenyApplication {
             }
         }
 
-        Logger.getLogger(TeenyApplication.class.getName())
-                .log(Level.INFO, "Teeny-route: " + path);
-
         return path;
     }
 
     private net.jonathangiles.tools.teenyhttpd.model.Method getMethod(Method method) {
+
         if (method.isAnnotationPresent(Get.class)) {
             return GET;
         }
 
-        if (method.isAnnotationPresent(Post.class)) {
-            return POST;
-        }
-
         if (method.isAnnotationPresent(Delete.class)) {
             return DELETE;
+        }
+
+        if (method.isAnnotationPresent(Post.class)) {
+            return POST;
         }
 
         if (method.isAnnotationPresent(Put.class)) {
@@ -196,6 +204,11 @@ public class TeenyApplication {
         }
 
         throw new IllegalArgumentException("Method not supported: " + method.getName());
+    }
+
+    private synchronized void _stop() {
+        server.stop();
+        started.set(false);
     }
 
     private synchronized void _start() {

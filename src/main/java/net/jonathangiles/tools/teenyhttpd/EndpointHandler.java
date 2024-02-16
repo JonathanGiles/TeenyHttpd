@@ -114,11 +114,18 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(RequestBody.class)) {
-                System.out.println("Not supported yet!");
+
+                if (request.getBody() == null) {
+                    continue;
+                }
+
+                try {
+                    args[i] = getMessageConverter(request).read(request.getBody(), parameter.getType());
+                } catch (Exception ex) {
+                    throw new BadRequestException("Invalid request body");
+                }
             }
-
         }
-
 
         return args;
     }
@@ -142,25 +149,33 @@ final class EndpointHandler implements Function<Request, Response> {
             try {
                 return URLDecoder.decode(source, StandardCharsets.UTF_8.toString());
             } catch (Exception ex) {
-                throw new IllegalArgumentException("Invalid URL encoding");
+                throw new BadRequestException("Invalid URL encoding");
             }
         }
 
         if (type.isEnum()) return Enum.valueOf((Class<Enum>) type, source);
 
-        if (type.isPrimitive() && source.isEmpty()) {
+        if (type.isPrimitive() && (source == null || source.isEmpty())) {
             if (type == int.class) return 0;
             if (type == long.class) return 0L;
             if (type == double.class) return 0.0;
             if (type == float.class) return 0.0f;
             if (type == boolean.class) return false;
+
+            throw new IllegalArgumentException("Unable to parse primitive type");
         }
 
-        if (type == Integer.class || type == int.class) return Integer.parseInt(source);
-        if (type == Long.class || type == long.class) return Long.parseLong(source);
-        if (type == Double.class || type == double.class) return Double.parseDouble(source);
-        if (type == Float.class || type == float.class) return Float.parseFloat(source);
-        if (type == Boolean.class || type == boolean.class) return Boolean.parseBoolean(source);
+        try {
+            if (type == Integer.class || type == int.class) return Integer.parseInt(source);
+            if (type == Long.class || type == long.class) return Long.parseLong(source);
+
+            if (type == Double.class || type == double.class) return Double.parseDouble(source);
+            if (type == Float.class || type == float.class) return Float.parseFloat(source);
+            if (type == Boolean.class || type == boolean.class) return Boolean.parseBoolean(source);
+
+        } catch (NumberFormatException ex) {
+            throw new BadRequestException("Invalid number value '" + source + "' ");
+        }
 
         return source;
     }
@@ -272,10 +287,6 @@ final class EndpointHandler implements Function<Request, Response> {
     }
 
     private Object invoke(Object[] args) {
-        if (Void.class.isAssignableFrom(target.getReturnType())) {
-            return null;
-        }
-
         try {
             return target.invoke(parent, args);
         } catch (IllegalAccessException | InvocationTargetException e) {
@@ -285,6 +296,10 @@ final class EndpointHandler implements Function<Request, Response> {
     }
 
     private Response convert(TypedResponse<?> response, MessageConverter converter) {
+
+        if (response.getBody() == null) {
+            return new EmptyResponse(response.getStatusCode());
+        }
 
         if (response.getHeaders() == null || response.getHeaders().isEmpty()) {
             response.setHeader(new Header("Content-Type", converter.getContentType()));
@@ -319,7 +334,7 @@ final class EndpointHandler implements Function<Request, Response> {
 
         @Override
         public void writeBody(BufferedOutputStream dataOut) throws IOException {
-            messageConverter.write(response.getValue(), dataOut);
+            messageConverter.write(response.getBody(), dataOut);
             dataOut.flush();
         }
     }

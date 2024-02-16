@@ -19,7 +19,7 @@ public class SimpleRequest implements Request {
     // These are 'raw' headers - they are not yet parsed into a map of headers
     private List<Header> headers;
     private Map<String, Header> headersMap;
-
+    private String body;
     private Map<String, String> pathParams; // FIXME: this is a hack
 
     public SimpleRequest(final Method method, final String path, final QueryParams queryParams) {
@@ -47,12 +47,13 @@ public class SimpleRequest implements Request {
     }
 
     public SimpleRequest(Method method, String path, QueryParams queryParams, final List<Header> headers,
-                         Map<String, String> pathParams) {
+                         Map<String, String> pathParams, String body) {
         this.method = method;
         this.path = path;
         this.queryParams = queryParams;
         this.headers = headers;
         this.pathParams = Collections.unmodifiableMap(pathParams);
+        this.body = body;
     }
 
     @Override public Method getMethod() {
@@ -61,6 +62,11 @@ public class SimpleRequest implements Request {
 
     @Override public String getPath() {
         return path;
+    }
+
+    @Override
+    public String getBody() {
+        return body;
     }
 
     /**

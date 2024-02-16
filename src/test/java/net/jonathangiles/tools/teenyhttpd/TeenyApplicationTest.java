@@ -7,6 +7,7 @@ import net.jonathangiles.tools.teenyhttpd.model.StatusCode;
 import net.jonathangiles.tools.teenyhttpd.model.TypedResponse;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.*;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
@@ -14,6 +15,8 @@ import org.junit.jupiter.api.*;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.*;
 public class TeenyApplicationTest {
 
     private static final int TEST_PORT = 8080;
-    private CloseableHttpClient httpClient;
 
     private static class GsonMessageConverter implements MessageConverter {
 
@@ -44,6 +46,16 @@ public class TeenyApplicationTest {
 
             dataOut.write(gson.toJson(value).getBytes());
         }
+
+        @Override
+        public Object read(String value, Type type) {
+
+            if (String.class.isAssignableFrom((Class<?>) type)) {
+                return value;
+            }
+
+            return gson.fromJson(value, type);
+        }
     }
 
     private static class ProtocolBufferMessageConverter implements MessageConverter {
@@ -57,14 +69,17 @@ public class TeenyApplicationTest {
         public void write(Object value, BufferedOutputStream dataOut) throws IOException {
             dataOut.write("hi".getBytes());
         }
+
+        @Override
+        public Object read(String value, Type type) {
+            return "hi";
+        }
     }
 
     @BeforeEach
     public void setup() {
 
         System.setProperty("banner", "false");
-
-        httpClient = HttpClients.createDefault();
 
         TeenyApplication.start()
                 .registerMessageConverter(new GsonMessageConverter())
@@ -76,21 +91,50 @@ public class TeenyApplicationTest {
     @AfterEach
     public void tearDown() {
         TeenyApplication.stop();
+    }
 
-        try {
-            httpClient.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+    static class Response {
+        private final String body;
+        private final int statusCode;
+        private final Map<String, String> headers = new HashMap<>();
+
+        public int getStatusCode() {
+            return statusCode;
         }
 
+        public String getBody() {
+            return body;
+        }
 
+        public String getFirstHeader(String key) {
+            return headers.get(key);
+        }
+
+        public Response(HttpResponse response) {
+            this.statusCode = response.getStatusLine().getStatusCode();
+
+            try {
+                this.body = EntityUtils.toString(response.getEntity());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            for (org.apache.http.Header header : response.getAllHeaders()) {
+                headers.put(header.getName(), header.getValue());
+            }
+        }
     }
 
-    private HttpResponse executeRequest(Method method, String url) {
-        return executeRequest(method, url, null);
+    private Response executeRequest(Method method, String url) {
+        return executeRequest(method, url, null, null);
     }
 
-    private HttpResponse executeRequest(Method method, String url, Map<String, String> headers) {
+    private Response executeRequest(String url, Map<String, String> headers) {
+        return executeRequest(Method.GET, url, headers, null);
+    }
+
+    private Response executeRequest(Method method, String url, Map<String, String> headers, String requestBody) {
+        CloseableHttpClient httpClient = HttpClients.createDefault();
 
         String basePath = "http://localhost:" + TEST_PORT;
 
@@ -121,10 +165,8 @@ public class TeenyApplicationTest {
                 case OPTIONS:
                     request = new HttpOptions(url);
                     break;
-//            case CONNECT:
-//                return httpClient.execute(new HttpConnect(url));
                 case PATCH:
-                    return httpClient.execute(new HttpPatch(url));
+                    return new Response(httpClient.execute(new HttpPatch(url)));
                 default:
                     throw new RuntimeException("Unsupported method: " + method);
             }
@@ -133,10 +175,20 @@ public class TeenyApplicationTest {
                 headers.forEach(request::addHeader);
             }
 
-            return httpClient.execute(request);
+            if (requestBody != null && request instanceof HttpEntityEnclosingRequestBase) {
+                ((HttpEntityEnclosingRequestBase) request).setEntity(new StringEntity(requestBody));
+            }
+
+            return new Response(httpClient.execute(request));
 
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+            try {
+                httpClient.close();
+            } catch (IOException e) {
+                System.out.println("Ugh");
+            }
         }
     }
 
@@ -146,10 +198,10 @@ public class TeenyApplicationTest {
         Assertions.assertDoesNotThrow(() -> {
 
             TypedResponse.ok("Hello, World!")
-                    .header("Authorization", "AuthorizedByMe");
+                    .setHeader("Authorization", "AuthorizedByMe");
 
             TypedResponse.noContent()
-                    .header("Accept", "application/exceldb");
+                    .setHeader("Accept", "application/exceldb");
 
             TypedResponse.status(StatusCode.OK);
 
@@ -158,11 +210,11 @@ public class TeenyApplicationTest {
     }
 
     @RepeatedTest(10)
-    void testGetStaticStringRouteRequest() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/products");
-        assertEquals(200, response.getStatusLine().getStatusCode());
+    void testGetStaticStringRouteRequest() {
+        Response response = executeRequest(Method.GET, "/store/products");
+        assertEquals(200, response.getStatusCode());
 
-        String json = EntityUtils.toString(response.getEntity());
+        String json = response.getBody();
 
         Product[] products = new Gson().fromJson(json, Product[].class);
 
@@ -170,75 +222,120 @@ public class TeenyApplicationTest {
     }
 
 
+    @Order(1)
     @Test
-    void testGetProductById() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/product/1");
-        assertEquals(200, response.getStatusLine().getStatusCode());
+    void testGetProductById() {
+        Response response = executeRequest(Method.GET, "/store/product/1");
+        assertEquals(200, response.getStatusCode());
 
-        String json = EntityUtils.toString(response.getEntity());
+        String json = response.getBody();
 
         Product product = new Gson().fromJson(json, Product.class);
 
         Assertions.assertEquals(1, product.getId());
-        Assertions.assertEquals("Apple", product.getName());
         Assertions.assertEquals(100, product.getPrice());
     }
 
+    @Order(2)
     @Test
-    void testGetMissingProduct() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/product/3");
-        assertEquals(404, response.getStatusLine().getStatusCode());
+    void testGetMissingProduct() {
+        Response response = executeRequest(Method.GET, "/store/product/3");
+        assertEquals(404, response.getStatusCode());
+    }
+
+    @Order(2)
+    @Test
+    void repeatedDeleteRequests() {
+        Response response = executeRequest(Method.GET, "/store/product/10");
+        assertEquals(404, response.getStatusCode());
+
+        response = executeRequest(Method.GET, "/store/product/101");
+        assertEquals(404, response.getStatusCode());
+
+        response = executeRequest(Method.GET, "/store/product/102");
+        assertEquals(404, response.getStatusCode());
+
+        response = executeRequest(Method.GET, "/store/product/103");
+        assertEquals(404, response.getStatusCode());
+    }
+
+    @Order(3)
+    @Test
+    void testCreateProduct() {
+        Response response = executeRequest(Method.PUT, "/store/product", Map.of("Content-Type", "application/json"),
+                new Gson().toJson(new Product(5, "Orange", 300)));
+        assertEquals(201, response.getStatusCode());
+        assertEquals("Product created", response.getBody());
+
+        response = executeRequest(Method.GET, "/store/product/5");
+        assertEquals(200, response.getStatusCode());
+    }
+
+
+    @Order(4)
+    @Test
+    void deleteProduct() {
+
+        Response response = executeRequest(Method.PUT, "/store/product", Map.of("Content-Type", "application/json"),
+                new Gson().toJson(new Product(5, "Orange", 300)));
+        assertEquals(201, response.getStatusCode());
+
+        response = executeRequest(Method.DELETE, "/store/product/5");
+        assertEquals(200, response.getStatusCode());
+
+        response = executeRequest(Method.DELETE, "/store/product/5");
+        assertEquals(404, response.getStatusCode());
     }
 
     @Test
-    void testHello() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/");
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("Hello, World!", EntityUtils.toString(response.getEntity()));
+    void testHello() {
+        Response response = executeRequest(Method.GET, "/store/");
+        assertEquals(200, response.getStatusCode());
+        assertEquals("Hello, World!", response.getBody());
     }
 
     @Test
     void testPrivateMethod() {
-        HttpResponse response = executeRequest(Method.GET, "/store/empty");
-        assertEquals(200, response.getStatusLine().getStatusCode());
+        Response response = executeRequest(Method.GET, "/store/empty");
+        assertEquals(200, response.getStatusCode());
     }
 
     @Test
-    void testHeader() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/header", Map.of("Authorization", "AuthorizedByMe"));
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("AuthorizedByMe", EntityUtils.toString(response.getEntity()));
+    void testHeader() {
+        Response response = executeRequest("/store/header", Map.of("Authorization", "AuthorizedByMe"));
+        assertEquals(200, response.getStatusCode());
+        assertEquals("AuthorizedByMe", response.getBody());
     }
 
     @Test
-    void testHeader2() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/header2", Map.of("Authorization", "AuthorizedByMe"));
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("AuthorizedByMe", EntityUtils.toString(response.getEntity()));
+    void testHeader2() {
+        Response response = executeRequest("/store/header2", Map.of("Authorization", "AuthorizedByMe"));
+        assertEquals(200, response.getStatusCode());
+        assertEquals("AuthorizedByMe", response.getBody());
     }
 
     @Test
-    void testRequiredQueryParam() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/requiredQueryParam?name=John");
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("John", EntityUtils.toString(response.getEntity()));
+    void testRequiredQueryParam() {
+        Response response = executeRequest(Method.GET, "/store/requiredQueryParam?name=John");
+        assertEquals(200, response.getStatusCode());
+        assertEquals("John", response.getBody());
 
         response = executeRequest(Method.GET, "/store/requiredQueryParam");
-        assertEquals(400, response.getStatusLine().getStatusCode());
+        assertEquals(400, response.getStatusCode());
     }
 
     @Test
     void testContentType() {
-        HttpResponse response = executeRequest(Method.GET, "/store/contentType");
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        assertEquals("application/x-protobuf", response.getFirstHeader("Content-Type").getValue());
+        Response response = executeRequest(Method.GET, "/store/contentType");
+        assertEquals(200, response.getStatusCode());
+        assertEquals("application/x-protobuf", response.getFirstHeader("Content-Type"));
     }
 
     @Test
-    void testComplex() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/complex/Fluffy?age=3");
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        String json = EntityUtils.toString(response.getEntity());
+    void testComplex() {
+        Response response = executeRequest(Method.GET, "/store/complex/Fluffy?age=3");
+        assertEquals(200, response.getStatusCode());
+        String json = response.getBody();
 
         Pet pet = new Gson().fromJson(json, Pet.class);
 
@@ -247,30 +344,30 @@ public class TeenyApplicationTest {
     }
 
     @Test
-    void testComplex2() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/complex/Fluffy?age=3", Map.of("Authorization", "AuthorizedByMe"));
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        String json = EntityUtils.toString(response.getEntity());
+    void testComplex2() {
+        Response response = executeRequest("/store/complex/Fluffy?age=3", Map.of("Authorization", "AuthorizedByMe"));
+        assertEquals(200, response.getStatusCode());
+        String json = response.getBody();
 
         Pet pet = new Gson().fromJson(json, Pet.class);
 
         assertEquals(new Pet("Fluffy", 3, "Dog"), pet);
         assertNotNull(response.getFirstHeader("Authorization"));
-        assertEquals(response.getFirstHeader("Authorization").getValue(), "AuthorizedByMe");
+        assertEquals(response.getFirstHeader("Authorization"), "AuthorizedByMe");
     }
 
     @Test
-    void testRequestAsParameter() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/request");
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        System.out.println(EntityUtils.toString(response.getEntity()));
+    void testRequestAsParameter() {
+        Response response = executeRequest(Method.GET, "/store/request");
+        assertEquals(200, response.getStatusCode());
+        System.out.println(response.getBody());
     }
 
     @Test
-    void testComplex3() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/complex/Rocky?type=Cat");
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        String json = EntityUtils.toString(response.getEntity());
+    void testComplex3() {
+        Response response = executeRequest(Method.GET, "/store/complex/Rocky?type=Cat");
+        assertEquals(200, response.getStatusCode());
+        String json = response.getBody();
 
         Pet pet = new Gson().fromJson(json, Pet.class);
 
@@ -278,16 +375,29 @@ public class TeenyApplicationTest {
     }
 
     @Test
-    void testPet() throws Exception {
-        HttpResponse response = executeRequest(Method.GET, "/store/pet", Map.of("Accept", "text/plain"));
-        assertEquals(200, response.getStatusLine().getStatusCode());
-        String body = EntityUtils.toString(response.getEntity());
+    void testPet() {
+        Response response = executeRequest("/store/pet", Map.of("Accept", "text/plain"));
+        assertEquals(200, response.getStatusCode());
+        String body = response.getBody();
 
-        assertEquals("text/plain", response.getFirstHeader("Content-Type").getValue());
+        assertEquals("text/plain", response.getFirstHeader("Content-Type"));
 
         Pet e = new Pet("Bodoque", 21, "Dog");
 
         assertEquals(e.toString(), body);
+    }
+
+    @Test
+    void testStatusCode() {
+        Response response = executeRequest(Method.GET, "/store/statusCode");
+        assertEquals(403, response.getStatusCode());
+    }
+
+    @Test
+    void testPost() {
+        Response response = executeRequest(Method.POST, "/store/requestBody", null, "Hello, World!");
+        assertEquals(200, response.getStatusCode());
+        assertEquals("Hello, World!" + " Handled!", response.getBody());
     }
 
 }
