@@ -114,6 +114,11 @@ public class StoreController {
         return StatusCode.FORBIDDEN;
     }
 
+    @Get("/statusCode2")
+    public TypedResponse<String> statusCode2() {
+        return StatusCode.FORBIDDEN.asTypedResponse();
+    }
+
     @Post("/requestBody")
     public String requestBody(@RequestBody String body) {
         return body + " Handled!";

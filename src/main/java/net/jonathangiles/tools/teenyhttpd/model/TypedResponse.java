@@ -8,7 +8,18 @@ public interface TypedResponse<T> extends Response {
 
     T getBody();
 
+    TypedResponse<T> removeHeader(String key);
+    TypedResponse<T> setHeader(Header header);
+
     TypedResponse<T> setHeader(String key, String value);
+
+    TypedResponse<T> setHeader(String key, String... values);
+
+    TypedResponse<T> addHeader(Header header);
+
+    TypedResponse<T> addHeader(String key, String... values);
+
+    TypedResponse<T> addHeader(String key, String value);
 
     TypedResponse<T> setBody(T header);
 

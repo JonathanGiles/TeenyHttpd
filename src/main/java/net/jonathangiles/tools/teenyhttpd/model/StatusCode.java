@@ -63,11 +63,23 @@ public enum StatusCode {
         return fullString;
     }
 
+    public int getCode() {
+        return code;
+    }
+
+    public String getReasonPhrase() {
+        return reasonPhrase;
+    }
+
     public Response asResponse() {
         return new EmptyResponse(this);
     }
 
     public <T> TypedResponse<T> asTypedResponse() {
         return new TypedResponseImpl<>(this, null);
+    }
+
+    public <T> TypedResponse<T> asTypedResponse(T body) {
+        return new TypedResponseImpl<>(this, body);
     }
 }

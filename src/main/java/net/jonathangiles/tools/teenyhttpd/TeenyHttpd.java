@@ -202,6 +202,8 @@ public class TeenyHttpd {
         System.out.println("TeenyHttp server stopped.");
     }
 
+    private final Pattern numberPattern = Pattern.compile("\\d+");
+
     private void handleIncomingRequest(final Socket clientSocket) {
         boolean isLongRunningConnection = false;
 
@@ -274,9 +276,9 @@ public class TeenyHttpd {
                 Header header = new Header(line);
                 headers.add(header);
 
-                if (header.getKey().equalsIgnoreCase("Content-Length")
-                        && !header.getValues().isEmpty()
-                        && header.getValues().get(0).matches("\\d+")) {
+                if ((method == Method.POST || method == Method.PUT || method == Method.PATCH)
+                        && (line.startsWith("Content-Length") || line.startsWith("content-length"))
+                        && numberPattern.matcher(header.getFirstValue()).matches()) {
                     contentLength = Integer.parseInt(header.getValues().get(0));
                 }
             }
@@ -495,7 +497,7 @@ public class TeenyHttpd {
             Matcher matcher = tokenPattern.matcher(original);
             while (matcher.find()) {
                 output.append(original, lastIndex, matcher.start())
-                      .append(converter.apply(matcher));
+                        .append(converter.apply(matcher));
                 lastIndex = matcher.end();
             }
             if (lastIndex < original.length()) {

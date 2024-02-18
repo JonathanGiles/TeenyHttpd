@@ -14,10 +14,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,15 +28,20 @@ final class EndpointHandler implements Function<Request, Response> {
     private final Object parent;
     private final Parameter[] parameters;
     private final MessageConverter defaultConverter;
+    private final Map<String, ServerSentEventHandler> eventMap;
     private final Map<String, MessageConverter> converterMap;
     private String contentType;
 
-    EndpointHandler(final Method target, final Object controller, Map<String, MessageConverter> converterMap) {
+    EndpointHandler(final Method target, final Object controller,
+                    Map<String, MessageConverter> converterMap,
+                    Map<String, ServerSentEventHandler> eventMap) {
+
         this.target = target;
         this.parent = controller;
         this.parameters = target.getParameters();
         this.converterMap = converterMap;
         this.defaultConverter = converterMap.getOrDefault(getContentType(), DefaultMessageConverter.INSTANCE);
+        this.eventMap = eventMap;
 
         if (!target.trySetAccessible()) {
             Logger.getLogger(EndpointHandler.class.getName())
@@ -124,6 +126,12 @@ final class EndpointHandler implements Function<Request, Response> {
                 } catch (Exception ex) {
                     throw new BadRequestException("Invalid request body");
                 }
+            }
+
+            if (parameter.isAnnotationPresent(EventHandler.class)) {
+
+                String name = parameter.getAnnotation(EventHandler.class).value();
+                args[i] = Objects.requireNonNull(eventMap.get(name), "No event handler found for `" + name + "`");
             }
         }
 
@@ -318,6 +326,41 @@ final class EndpointHandler implements Function<Request, Response> {
         }
 
         @Override
+        public Response removeHeader(String key) {
+            return response.removeHeader(key);
+        }
+
+        @Override
+        public Response setHeader(String key, String value) {
+            this.response.setHeader(key, value);
+            return this;
+        }
+
+        @Override
+        public Response setHeader(String key, String... values) {
+            this.response.setHeader(key, values);
+            return this;
+        }
+
+        @Override
+        public Response addHeader(String key, String... values) {
+            this.response.addHeader(key, values);
+            return this;
+        }
+
+        @Override
+        public Response addHeader(String key, String value) {
+            this.response.addHeader(key, value);
+            return this;
+        }
+
+        @Override
+        public Response addHeader(Header header) {
+            this.response.addHeader(header);
+            return this;
+        }
+
+        @Override
         public List<Header> getHeaders() {
             return response.getHeaders();
         }
@@ -328,8 +371,9 @@ final class EndpointHandler implements Function<Request, Response> {
         }
 
         @Override
-        public void setHeader(Header header) {
+        public Response setHeader(Header header) {
             response.setHeader(header);
+            return this;
         }
 
         @Override

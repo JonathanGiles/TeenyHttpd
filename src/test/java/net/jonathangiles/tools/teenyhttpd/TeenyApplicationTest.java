@@ -26,37 +26,7 @@ public class TeenyApplicationTest {
 
     private static final int TEST_PORT = 8080;
 
-    private static class GsonMessageConverter implements MessageConverter {
 
-        final Gson gson = new Gson();
-
-        @Override
-        public String getContentType() {
-            return "application/json";
-        }
-
-        @Override
-        public void write(Object value, BufferedOutputStream dataOut) throws IOException {
-
-
-            if (value instanceof String) {
-                dataOut.write(((String) value).getBytes());
-                return;
-            }
-
-            dataOut.write(gson.toJson(value).getBytes());
-        }
-
-        @Override
-        public Object read(String value, Type type) {
-
-            if (String.class.isAssignableFrom((Class<?>) type)) {
-                return value;
-            }
-
-            return gson.fromJson(value, type);
-        }
-    }
 
     private static class ProtocolBufferMessageConverter implements MessageConverter {
 

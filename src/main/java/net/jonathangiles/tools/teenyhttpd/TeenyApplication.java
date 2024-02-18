@@ -3,7 +3,9 @@ package net.jonathangiles.tools.teenyhttpd;
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
 import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
+import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
 
+import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -28,6 +30,14 @@ public class TeenyApplication {
         return instance;
     }
 
+    public static TeenyApplication start(Class<?> clazz) {
+        start();
+
+        instance.register(clazz);
+
+        return instance;
+    }
+
     public static void stop() {
         if (instance == null) return;
 
@@ -37,6 +47,7 @@ public class TeenyApplication {
     private final TeenyHttpd server;
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final Map<String, MessageConverter> messageConverterMap;
+    private final Map<String, ServerSentEventHandler> eventMap = new HashMap<>();
 
     private TeenyApplication() {
         server = new TeenyHttpd(Integer.parseInt(System.getProperty("server.port", "8080")));
@@ -60,11 +71,15 @@ public class TeenyApplication {
         if (opConstructor.isPresent()) {
             try {
                 Object instance = opConstructor.get().newInstance();
+
                 addController(instance);
+
+                return this;
             } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
                 throw new RuntimeException(e);
             }
         }
+
 
         throw new IllegalArgumentException("Controller must have a default constructor");
     }
@@ -81,6 +96,19 @@ public class TeenyApplication {
 
         Method[] methods = controller.getClass().getDeclaredMethods();
 
+
+        for (Method method : methods) {
+            if (method.isAnnotationPresent(Configuration.class)) {
+                handleConfiguration(controller, method);
+                continue;
+            }
+
+            if (method.isAnnotationPresent(ServerEvent.class)
+                    && ServerSentEventHandler.class.isAssignableFrom(method.getReturnType())) {
+                addServerEvent(controller, method);
+            }
+        }
+
         for (Method method : methods) {
 
             if (method.isAnnotationPresent(Get.class) ||
@@ -90,16 +118,70 @@ public class TeenyApplication {
                     method.isAnnotationPresent(Patch.class)) {
 
                 addEndpoint(controller, method);
+
             }
+        }
+    }
+
+    private void handleConfiguration(Object controller, Method method) {
+
+        if (Void.class.isAssignableFrom(method.getReturnType())) {
+            return;
+        }
+
+        try {
+            method.setAccessible(true);
+            Object configuration = method.invoke(controller);
+
+            if (configuration instanceof MessageConverter) {
+                registerMessageConverter((MessageConverter) configuration);
+            }
+
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void addServerEvent(Object controller, Method method) {
+
+        method.setAccessible(true);
+
+        try {
+
+            String route = method.getAnnotation(ServerEvent.class).value();
+
+            if (eventMap.containsKey(route)) {
+                throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Server event already exists at this route");
+            }
+
+            ServerSentEventHandler result = (ServerSentEventHandler) method.invoke(controller);
+            eventMap.put(method.getName(), result);
+            server.addServerSentEventRoute(route, result);
+
+            Logger.getLogger(TeenyApplication.class.getName()).log(Level.INFO, "Added server event: " + method.getName() + " at route " + route);
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
         }
     }
 
     private void addEndpoint(Object controller, Method method) {
 
+        if (File.class.isAssignableFrom(method.getReturnType())) {
+            try {
+                method.setAccessible(true);
+                server.addFileRoute(getRoute(controller, method), (File) method.invoke(controller));
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                Logger.getLogger(TeenyApplication.class.getName()).log(Level.SEVERE, "Error adding file route", e);
+            }
+
+            return;
+        }
+
         validateMethod(controller, method);
 
         server.addRoute(getMethod(method), getRoute(controller, method),
-                new EndpointHandler(method, controller, messageConverterMap));
+                new EndpointHandler(method, controller, messageConverterMap, eventMap));
+
     }
 
     private void validateMethod(Object controller, Method method) {
