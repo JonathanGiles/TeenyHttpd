@@ -30,7 +30,7 @@ public class ChatServerButUsingAnnotations {
         return new GsonMessageConverter();
     }
 
-    @ServerEvent("/messages")
+    @ServerEvent(value = "/messages", name = "messages")
     public ServerSentEventHandler chatMessages() {
         return ServerSentEventHandler.create();
     }
@@ -47,7 +47,7 @@ public class ChatServerButUsingAnnotations {
 
     @Post("/message")
     public void message(@QueryParam("message") String message,
-                        @EventHandler("chatMessages") ServerSentEventHandler chatMessagesEventHandler) {
+                        @EventHandler("messages") ServerSentEventHandler chatMessagesEventHandler) {
 
         if (message.isEmpty()) {
             return;
@@ -59,7 +59,7 @@ public class ChatServerButUsingAnnotations {
     @Post("/login")
     public void login(@QueryParam("username") String username,
                       @EventHandler("users") ServerSentEventHandler usersEventHandler,
-                      @EventHandler("chatMessages") ServerSentEventHandler chatMessagesEventHandler) {
+                      @EventHandler("messages") ServerSentEventHandler chatMessagesEventHandler) {
 
         if (username.isEmpty()) {
             return;
@@ -73,7 +73,7 @@ public class ChatServerButUsingAnnotations {
     @Post("/logout")
     public void logout(@QueryParam("username") String username,
                        @EventHandler("users") ServerSentEventHandler usersEventHandler,
-                       @EventHandler("chatMessages") ServerSentEventHandler chatMessagesEventHandler) {
+                       @EventHandler("messages") ServerSentEventHandler chatMessagesEventHandler) {
 
         if (username.isEmpty()) {
             return;

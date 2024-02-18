@@ -11,4 +11,5 @@ public @interface ServerEvent {
 
     String value() default "/";
 
+    String name() default "";
 }

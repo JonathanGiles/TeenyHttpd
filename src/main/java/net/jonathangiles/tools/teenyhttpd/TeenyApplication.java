@@ -148,17 +148,24 @@ public class TeenyApplication {
 
         try {
 
-            String route = method.getAnnotation(ServerEvent.class).value();
+            ServerEvent annot = method.getAnnotation(ServerEvent.class);
 
-            if (eventMap.containsKey(route)) {
-                throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Server event already exists at this route");
+            String route = annot.value();
+            String name = annot.name().trim();
+
+            if (name.isEmpty()) {
+                name = method.getName();
+            }
+
+            if (eventMap.containsKey(name)) {
+                throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Event name already exists: " + name);
             }
 
             ServerSentEventHandler result = (ServerSentEventHandler) method.invoke(controller);
-            eventMap.put(method.getName(), result);
+            eventMap.put(name, result);
             server.addServerSentEventRoute(route, result);
 
-            Logger.getLogger(TeenyApplication.class.getName()).log(Level.INFO, "Added server event: " + method.getName() + " at route " + route);
+            Logger.getLogger(TeenyApplication.class.getName()).log(Level.INFO, "Added server event: " + name + " at route " + route);
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }

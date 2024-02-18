@@ -207,8 +207,6 @@
         // Listen for messages
         eventSource.onmessage = function (event) {
 
-            console.log(event.data)
-
             // Parse the JSON data
             const data = JSON.parse(event.data);
 
