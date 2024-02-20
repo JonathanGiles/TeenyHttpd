@@ -29,14 +29,14 @@ The following examples demonstrate how to use TeenyHttpd to serve static content
 
 ### Serving Static Content
 
-If you already have content you want to serve, you can simply place the latest `teenyhttpd-x.y.z.jar` file in the same 
+If you already have content you want to serve, you can simply place the latest `teenyhttpd-x.y.z.jar` file in the same
 directory as your content, and then run the following command:
 
 ```bash
 java -jar teenyhttpd-x.y.z.jar
 ```
 
-This will start a server on port 80, and will serve all content from the directory that the JAR file is located in. 
+This will start a server on port 80, and will serve all content from the directory that the JAR file is located in.
 There is a `--help` parameter that will give some useful guidance on how to customize the server, which is shown below:
 
 ``` 
@@ -55,7 +55,7 @@ Options:
 
 ### Programmatically Serving Files from a Webroot
 
-By default, with the configuration below, TeenyHttpd will serve files from within the `/src/main/resources/webroot` 
+By default, with the configuration below, TeenyHttpd will serve files from within the `/src/main/resources/webroot`
 directory, and they will be accessible from the root path (for example, a GET request for `http://localhost/index.html` will look in the root of the `webroot` directory for an `index.html` file):
 
 ```java
@@ -71,7 +71,7 @@ You can change the path to the webroot directory by passing in a `File` object t
 final int PORT = 80;
 TeenyHttpd server = new TeenyHttpd(PORT);
 server.addFileRoute("/", new File("/path/to/webroot"));
-server.start();
+        server.start();
 ```
 
 You can also change the request path that is used to access the webroot directory:
@@ -80,24 +80,24 @@ You can also change the request path that is used to access the webroot director
 final int PORT = 80;
 TeenyHttpd server = new TeenyHttpd(PORT);
 server.addFileRoute("/files", new File("/path/to/webroot"));
-server.start();
+        server.start();
 ```
 
 ### Programmatic Routes
 
-You can also programmatically define routes to serve. For example, the following code will serve a `Hello world!` 
+You can also programmatically define routes to serve. For example, the following code will serve a `Hello world!`
 when a GET request is received for the `/hello` path:
 
 ```java
 final int PORT = 80;
 TeenyHttpd server = new TeenyHttpd(PORT);
 server.addStringRoute("/hello", request -> "Hello world!");
-server.start();
+        server.start();
 ```
 
 #### HTTP Methods
 
-The TeenyHttpd server supports all HTTP methods. There is an `addGetRoute` method for the commonly-used GET method, 
+The TeenyHttpd server supports all HTTP methods. There is an `addGetRoute` method for the commonly-used GET method,
 as well as a generic `addRoute` method that can be used to specify any HTTP method. For example, the following code
 will serve a `Hello world!` when a GET request is received for the `/hello` path, but will return a 404 for any other
 HTTP method:
@@ -106,7 +106,7 @@ HTTP method:
 final int PORT = 80;
 TeenyHttpd server = new TeenyHttpd(PORT);
 server.addGetRoute("/hello", request -> "Hello world!");
-server.start();
+        server.start();
 ```
 
 For all other HTTP methods, you can use the `addRoute` method. For example, the following code will serve a `Hello world!`
@@ -116,17 +116,17 @@ when a POST request is received for the `/hello` path, but will return a 404 for
 final int PORT = 80;
 TeenyHttpd server = new TeenyHttpd(PORT);
 server.addRoute(HttpMethod.POST, "/hello", request -> "Hello world!");
-server.start();
+        server.start();
 ```
 
 ### Path Parameters
 
-It is possible to specify path parameters in the path that is registered by using the `:` character. For example, 
+It is possible to specify path parameters in the path that is registered by using the `:` character. For example,
 the following code will serve a response of `User ID: 123` when a GET request is received for the `/user/123/details`
 
 ```java
 server.addGetRoute("/user/:id/details", request -> {
-    String id = request.getPathParams().get("id");
+String id = request.getPathParams().get("id");
     return Response.create(StatusCode.OK, "User ID: " + id);
 });
 ```
@@ -138,8 +138,8 @@ parameters that are received in a GET request on the route `/QueryParams`:
 
 ```java
 server.addGetRoute("/QueryParams", request -> {
-    request.getQueryParams().forEach((key, value) -> System.out.println(key + " = " + value));
-    return StatusCode.OK.asResponse();
+        request.getQueryParams().forEach((key, value) -> System.out.println(key + " = " + value));
+        return StatusCode.OK.asResponse();
 });
 ```
 
@@ -159,16 +159,16 @@ with a `ServerSentEventHandler`. For example, the following code will send a mes
 final int PORT = 80;
 TeenyHttpd server = new TeenyHttpd(PORT);
 server.addServerSentEventRoute("/events", ServerSentEventHandler.create(sse -> new Thread(() -> {
-    int i = 0;
+int i = 0;
     while (sse.hasActiveConnections()) {
         sse.sendMessage(new ServerSentEventMessage("Message " + i++, "counter"));
-        threadSleep(1000);
+threadSleep(1000);
     }
-}).start()));
-server.start();
+            }).start()));
+        server.start();
 ```
 
-If more than one user connects to the same /events topic, they will share the same state, each getting the same value 
+If more than one user connects to the same /events topic, they will share the same state, each getting the same value
 for `i` at the same time. If you want to customise the response per user (for example, based on a path parameter or
 query parameter), you can use the message generator feature:
 
@@ -193,9 +193,9 @@ ServerSentEventHandler sse = ServerSentEventHandler.create((ServerSentEventHandl
 server.addServerSentEventRoute("/sse/:username", sse);
 ```
 
-The above samples assume that you start a thread when there are active connections, to send messages to connected 
+The above samples assume that you start a thread when there are active connections, to send messages to connected
 clients at a regular interval. Another approach is to just have a ServerSentEventHandler that sends messages to
-connected clients when a message is received. For example, the following code will send a message to all clients 
+connected clients when a message is received. For example, the following code will send a message to all clients
 that are connected to the `/messages` topic, when a message is posted to `/message`:
 
 ```java
@@ -204,15 +204,15 @@ TeenyHttpd server = new TeenyHttpd(PORT);
 ServerSentEventHandler chatMessagesEventHandler = ServerSentEventHandler.create();
 server.addServerSentEventRoute("/messages", chatMessagesEventHandler);
 server.addRoute(Method.POST, "/message", request -> {
-    String message = request.getQueryParams().get("message");
+String message = request.getQueryParams().get("message");
     if (message != null && !message.isEmpty()) {
         chatMessagesEventHandler.sendMessage(message);
     }
-    return StatusCode.OK.asResponse();
+            return StatusCode.OK.asResponse();
 });
 ```
 
-For a complete example, check out the [ChatServer](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServer.java) 
+For a complete example, check out the [ChatServer](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServer.java)
 demo application, that demonstrates how to use Server-Sent Events to create a simple chat server.
 
 ### Stopping TeenyHttpd
@@ -283,15 +283,70 @@ As you might expect, there are annotations for many of the common use cases:
 
 ### Server-Sent Events
 
-TODO
+Simply define the handler and give it a name, if no name is specified then the name of the method will be used instead.
+
+```java
+@ServerEvent(value = "/messages", name = "messages")
+public ServerSentEventHandler chatMessages() {
+    return ServerSentEventHandler.create();
+}
+```
+
+Use it directly anywhere:
+
+```java
+Post("/message")
+public void message(@QueryParam("message") String message,
+                    @EventHandler("messages") ServerSentEventHandler chatMessagesEventHandler) {
+    chatMessagesEventHandler.sendMessage(message);
+}
+```
+
+Similar to the [ChatServer](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServer.java) demo application linked above (which simply uses TeenyHttpd), [there is also one built using annotations and TeenyApplication](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServerButUsingAnnotations.java).
 
 ### Message Converters
 
-TODO
+TeenyApplication provides support for custom message converters. These converters are used to handle specific content types as specified by the user. For example the following code handles requests of content type `application/json`
 
-### @Configuration
+```java
+public class GsonMessageConverter implements MessageConverter {
 
-TODO
+    final Gson gson = new Gson();
+
+    @Override
+    public String getContentType() {
+        return "application/json";
+    }
+
+    @Override
+    public void write(Object value, BufferedOutputStream dataOut) throws IOException {
+        if (value instanceof String) {
+            dataOut.write(((String) value).getBytes());
+            return;
+        }
+
+        dataOut.write(gson.toJson(value).getBytes());
+    }
+
+    @Override
+    public Object read(String value, Type type) {
+        if (String.class.isAssignableFrom((Class<?>) type)) {
+            return value;
+        }
+
+        return gson.fromJson(value, type);
+    }
+}
+```
+
+Similar to Spring, `@Configuration` is used to provide configurations. To specify a custom MessageConverter, you can define your configuration as shown below, within your application:
+
+```java
+@Configuration
+public GsonMessageConverter getGsonConverter() {
+	return new GsonMessageConverter();
+}
+```
 
 ## Project Management
 
