@@ -35,7 +35,19 @@ public class TeenyJsonTest {
                         .setType("Dog")
                         .setAge(1));
 
-        String json = new TeenyJson().writeValueAsString(person);
+        TeenyJson teenyJson = new TeenyJson();
+
+        long init = System.nanoTime();
+
+        String json = teenyJson.writeValueAsString(person);
+
+        System.out.println(json + " " + (System.nanoTime() - init) + " ns");
+
+        init = System.nanoTime();
+
+        json = teenyJson.writeValueAsString(person);
+
+        System.out.println(json + " " + (System.nanoTime() - init) + " ns");
 
 
         Gson gson = new GsonBuilder()
@@ -53,14 +65,26 @@ public class TeenyJsonTest {
 
         Person newPerson = gson.fromJson(json, Person.class);
 
+
         if (!person.equals(newPerson)) {
 
             System.out.println(person);
             System.out.println(newPerson);
 
             Assertions.fail("Objects are not equal");
-
         }
+
+        init = System.nanoTime();
+
+        teenyJson.setSerializer(String.class, (value) -> "\"hi\"");
+
+        json = teenyJson.writeValueAsString(person);
+
+        System.out.println(json + " " + (System.nanoTime() - init) + " ns");
+
+        newPerson = gson.fromJson(json, Person.class);
+
+        Assertions.assertEquals("hi", newPerson.getName());
 
     }
 

@@ -6,6 +6,7 @@ import net.jonathangiles.tools.teenyhttpd.implementation.ReflectionUtils;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.lang.invoke.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -13,6 +14,8 @@ import java.lang.reflect.Parameter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -22,6 +25,14 @@ import java.util.stream.Collectors;
  *
  */
 public class TeenyJson {
+
+    private final Map<Class<?>, Mapper> cache = new ConcurrentHashMap<>();
+    private final Map<Class<?>, ValueSerializer> serializers = new ConcurrentHashMap<>();
+
+    public TeenyJson setSerializer(Class<?> clazz, ValueSerializer serializer) {
+        serializers.put(clazz, serializer);
+        return this;
+    }
 
     public void writeValue(BufferedOutputStream baos, Object value) throws IOException {
         baos.write(writeValueAsString(value).getBytes());
@@ -191,6 +202,12 @@ public class TeenyJson {
 
     private String serialize(Object object) {
 
+        Mapper cachedMapper = cache.get(object.getClass());
+
+        if (cachedMapper != null) {
+            return cachedMapper.serialize(object, this);
+        }
+
         final Class<?> clazz = object.getClass();
 
         if (clazz.getName()
@@ -199,79 +216,64 @@ public class TeenyJson {
             return writeValue(object);
         }
 
-        final boolean includeNonNull = clazz.isAnnotationPresent(JsonIncludeNonNull.class);
 
         Method[] methods = clazz.getDeclaredMethods();
 
-        StringBuilder builder = new StringBuilder();
-
-        builder.append("{");
-
-        List<String> properties = new ArrayList<>();
+        Mapper mapper = new Mapper(clazz);
+        cache.put(clazz, mapper);
 
         for (Method method : methods) {
-            if (method.isAnnotationPresent(JsonIgnore.class)) continue;
-            if (Modifier.isStatic(method.getModifiers())) continue;
-            if (method.getParameterCount() > 0) continue;
-
-            properties.add(writeField(method, object, includeNonNull));
-
-        }
-
-        builder.append(properties.stream()
-                .filter(Objects::nonNull)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.joining(", ")));
-
-        builder.append("}");
-
-        return builder.toString();
-    }
-
-    private String writeField(Method method, Object object, boolean includeNonNull) {
-
-        StringBuilder builder = new StringBuilder();
-
-        if (method.getName().startsWith("get") || method.getName().startsWith("is")) {
-
             try {
 
-                method.setAccessible(true);
+                if (method.getName().equals("hashCode")) continue;
 
-                Object value = method.invoke(object);
-
-                if (includeNonNull && value == null) return null;
-
-                String name = getFieldName(method);
-
-                builder.append("\"").append(name).append("\": ");
-
-                if (value instanceof Collection) {
-                    builder.append("[");
-
-                    String collection = ((Collection<?>) value)
-                            .stream()
-                            .map(this::serialize)
-                            .collect(Collectors.joining(", "));
-
-                    builder.append(collection);
-
-                    builder.append("]");
-
-                    return builder.toString();
-                }
-
-                builder.append(writeValue(value));
-            } catch (Exception e) {
+                mapper.put(method);
+            } catch (Throwable e) {
                 Logger.getLogger(TeenyJson.class.getName())
                         .log(Level.SEVERE, "Error serializing object: " + object.getClass().getName(), e);
             }
+
+        }
+
+        return mapper.serialize(object, this);
+    }
+
+    private String writeField(String name, Object value, boolean includeNonNull) {
+
+        StringBuilder builder = new StringBuilder();
+
+
+        try {
+
+            if (includeNonNull && value == null) return null;
+
+            builder.append("\"").append(name).append("\": ");
+
+            if (value instanceof Collection) {
+                builder.append("[");
+
+                String collection = ((Collection<?>) value)
+                        .stream()
+                        .map(this::serialize)
+                        .collect(Collectors.joining(", "));
+
+                builder.append(collection);
+
+                builder.append("]");
+
+                return builder.toString();
+            }
+
+            builder.append(writeValue(value));
+        } catch (Exception e) {
+            Logger.getLogger(TeenyJson.class.getName())
+                    .log(Level.SEVERE, null, e);
         }
 
         return builder.toString();
     }
 
-    private String getFieldName(Method method) {
+    private static String getFieldName(Method method) {
 
         if (method.isAnnotationPresent(JsonAlias.class)) {
             return method.getAnnotation(JsonAlias.class).value();
@@ -294,6 +296,12 @@ public class TeenyJson {
 
         if (value == null) return "null";
 
+
+        ValueSerializer serializer = serializers.get(value.getClass());
+
+        if (serializer != null) {
+            return serializer.serialize(value);
+        }
 
         if (value instanceof String) {
             return "\"" + escapeJsonString((String) value) + "\"";
@@ -374,6 +382,71 @@ public class TeenyJson {
             }
         }
         return sb.toString();
+    }
+
+    private static class Mapper extends HashMap<String, Function<Object, Object>> {
+
+        private final Class<?> target;
+        private final boolean includeNonNull;
+
+        public Mapper(Class<?> target) {
+            this.target = target;
+            includeNonNull = target.isAnnotationPresent(JsonIncludeNonNull.class);
+        }
+
+        private void put(Method method) throws Throwable {
+
+            if (method.isAnnotationPresent(JsonIgnore.class)) return;
+            if (Modifier.isStatic(method.getModifiers())) return;
+            if (method.getParameterCount() > 0) return;
+
+            String fieldName = getFieldName(method);
+            put(fieldName, createFunction(target, method.getName(), method.getReturnType()));
+        }
+
+        private String serialize(Object object, TeenyJson teenyJson) {
+
+            List<String> properties = new ArrayList<>();
+
+            for (Entry<String, Function<Object, Object>> entry : entrySet()) {
+
+                Object value = entry.getValue().apply(object);
+
+                if (value == null && !includeNonNull) continue;
+
+                String field = teenyJson.writeField(entry.getKey(), value, includeNonNull);
+
+                if (field == null) continue;
+
+                properties.add(field);
+            }
+
+            return "{" + String.join(", ", properties) + "}";
+        }
+    }
+
+    private static Function<Object, Object> createFunction(Class<?> targetClass, String targetMethod, Class<?> targetMethodReturnType) throws Throwable {
+        MethodHandles.Lookup lookup = getLookup(targetClass);
+        MethodHandle virtualMethodHandle = lookup.findVirtual(targetClass, targetMethod, MethodType.methodType(targetMethodReturnType));
+        CallSite site = LambdaMetafactory.metafactory(lookup,
+                "apply",
+                MethodType.methodType(Function.class),
+                MethodType.methodType(Object.class, Object.class),
+                virtualMethodHandle,
+                MethodType.methodType(targetMethodReturnType, targetClass));
+        @SuppressWarnings("unchecked")
+        Function<Object, Object> getterFunction = (Function<Object, Object>) site.getTarget().invokeExact();
+        return getterFunction;
+    }
+
+    private static MethodHandles.Lookup getLookup(Class<?> targetClass) {
+        MethodHandles.Lookup lookupMe = MethodHandles.lookup();
+
+        try {
+            return MethodHandles.privateLookupIn(targetClass, lookupMe);
+        } catch (IllegalAccessException e) {
+            return lookupMe;
+        }
     }
 
 }
