@@ -1,12 +1,14 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 import com.google.gson.Gson;
+import net.jonathangiles.tools.teenyhttpd.annotations.Configuration;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Type;
 
+@Configuration
 public class GsonMessageConverter implements MessageConverter {
 
     final Gson gson = new Gson();

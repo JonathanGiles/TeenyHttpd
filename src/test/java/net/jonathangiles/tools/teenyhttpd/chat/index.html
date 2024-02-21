@@ -193,7 +193,7 @@
         }
 
         // Send the username to the server
-        fetch(`http://localhost:80/login?username=${encodeURIComponent(username)}`, {
+        fetch(`http://${window.location.host}:80/login?username=${encodeURIComponent(username)}`, {
             method: 'POST'
         });
 
@@ -202,7 +202,7 @@
         messageInput.focus();
 
         // Create new EventSource
-        const eventSource = new EventSource('http://localhost:80/messages');
+        const eventSource = new EventSource(`http://${window.location.host}:80/messages`);
 
         // Listen for messages
         eventSource.onmessage = function (event) {
@@ -275,7 +275,7 @@
 
         const message = encodeURIComponent(JSON.stringify(messageData));
 
-        fetch(`http://localhost:80/message?message=${message}`, {
+        fetch(`http://${window.location.host}:80/message?message=${message}`, {
             method: 'POST'
         });
 
@@ -289,7 +289,7 @@
      *****************************************************************************/
 
         // Create new EventSource for the /users endpoint
-    const usersEventSource = new EventSource('http://localhost:80/users');
+    const usersEventSource = new EventSource(`http://${window.location.host}:80/users`);
 
     // Listen for changes to the connected users list
     usersEventSource.onmessage = function (event) {
@@ -315,7 +315,7 @@
 
     // log the user out when they close the tab
     window.onbeforeunload = function () {
-        fetch(`http://localhost:80/logout?username=${encodeURIComponent(username)}`, {
+        fetch(`http://${window.location.host}:80/logout?username=${encodeURIComponent(username)}`, {
             method: 'POST'
         });
     };
