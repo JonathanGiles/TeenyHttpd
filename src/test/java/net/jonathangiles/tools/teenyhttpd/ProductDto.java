@@ -1,5 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd;
 
+
 import net.jonathangiles.tools.teenyhttpd.json.JsonIncludeNonNull;
 
 import java.util.Map;
@@ -12,6 +13,7 @@ public class ProductDto {
     public int price;
     public Map<String, Object> perks;
 
+
     public ProductDto() {
     }
 
@@ -20,6 +22,7 @@ public class ProductDto {
         this.name = name;
         this.price = price;
     }
+
 
     public Map<String, Object> getPerks() {
         return perks;

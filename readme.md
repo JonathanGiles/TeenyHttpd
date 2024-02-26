@@ -5,7 +5,7 @@
 <picture><img src="https://img.shields.io/github/license/JonathanGiles/TeenyHttpd?color=blue" /></picture>
 <picture><img src="https://img.shields.io/github/actions/workflow/status/JonathanGiles/TeenyHttpd/main.yml?color=blue" /></picture>
 
-TeenyHttpd is an extremely basic HTTP server. It is implemented in plain Java 8 with no runtime dependencies, making it lightweight and applicable in situations where a basic, small HTTP server is all that is required.
+TeenyHttpd is an extremely basic HTTP server, as well as an extremely basic application stack (similar to Spring). It is implemented in plain old Java with no runtime dependencies, making it lightweight and applicable in situations where a basic, small HTTP server and application stack is all that is required.
 
 ## Getting Started
 
@@ -19,11 +19,13 @@ To make use of TeenyHttpd in your project, just add the following Maven dependen
 </dependency>
 ```
 
-## Documentation
+## Reference Documentation
 
 The TeenyHttpd JavaDoc for the current code in this repo is available [here](https://teenyhttpd.z22.web.core.windows.net/). This may be different than the JavaDoc for the most recent release.
 
-## Examples
+## TeenyHttpd Examples
+
+The following examples demonstrate how to use TeenyHttpd to serve static content, as well as how to programmatically define routes. Further down this page are examples of how to use the TeenyApplication application stack.
 
 ### Serving Static Content
 
@@ -224,6 +226,126 @@ server.start();
 
 // some time later...
 server.stop();
+```
+
+## TeenyApplication Examples
+
+What was shown above is the 'low-level' APIs of TeenyHttpd. However, TeenyHttpd also includes a simple application stack called TeenyApplication. This application stack is similar to Spring, but is much simpler and lighter weight.
+
+A basic application starts as follows:
+
+```java
+public class RestApp {
+    public static void main(String[] args) {
+        System.setProperty("server.port", "80");
+        TeenyApplication.start(RestApp.class);
+    }
+}
+```
+
+Of course, this isn't all that useful, as we have not defined any routes. Let's update the code above to do that now:
+
+```java
+public class RestApp {
+    public static void main(String[] args) {
+        System.setProperty("server.port", "80");
+        TeenyApplication.start(RestApp.class);
+    }
+
+    @Post("/message")
+    public void message(@QueryParam("message") String message) {
+        // do something with the message that was posted to the /message route
+    }
+
+    @Get("/products")
+    public Collection<Product> get() {
+        // return a collection of products
+    }
+
+    @Get("/product/:id")
+    public TypedResponse<Product> getProduct(@PathParam("id") int id) {
+        // Do something like this, by taking the 'id' path parameter and looking up a product
+        Product product = productMap.get(id);
+        if (product != null) return TypedResponse.ok(product);
+        return TypedResponse.notFound();
+    }
+}
+```
+
+As you might expect, there are annotations for many of the common use cases:
+
+* HTTP Methods: `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch`
+* Path Parameters: `@PathParam`
+* Query Parameters: `@QueryParam`
+* Headers: `@RequestHeader`
+* Request Body: `@RequestBody`
+* Server-Sent Events: `@ServerEvent`
+
+### Server-Sent Events
+
+Simply define the handler and give it a name, if no name is specified then the name of the method will be used instead.
+
+```java
+@ServerEvent(value = "/messages", name = "messages")
+public ServerSentEventHandler chatMessages() {
+    return ServerSentEventHandler.create();
+}
+```
+
+Use it directly anywhere:
+
+```java
+Post("/message")
+public void message(@QueryParam("message") String message,
+                    @EventHandler("messages") ServerSentEventHandler chatMessagesEventHandler) {
+    chatMessagesEventHandler.sendMessage(message);
+}
+```
+
+Similar to the [ChatServer](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServer.java) demo application linked above (which simply uses TeenyHttpd), [there is also one built using annotations and TeenyApplication](https://github.com/JonathanGiles/TeenyHttpd/blob/master/src/test/java/net/jonathangiles/tools/teenyhttpd/chat/ChatServerButUsingAnnotations.java).
+
+### Message Converters
+
+TeenyApplication provides support for custom message converters. These converters are used to handle specific content types as specified by the user. For example the following code handles requests of content type `application/json`
+
+```java
+public class GsonMessageConverter implements MessageConverter {
+
+    final Gson gson = new Gson();
+
+    @Override
+    public String getContentType() {
+        return "application/json";
+    }
+
+    @Override
+    public void write(Object value, BufferedOutputStream dataOut) throws IOException {
+        if (value instanceof String) {
+            dataOut.write(((String) value).getBytes());
+            return;
+        }
+
+        dataOut.write(gson.toJson(value).getBytes());
+    }
+
+    @Override
+    public Object read(String value, Type type) {
+        if (String.class.isAssignableFrom((Class<?>) type)) {
+            return value;
+        }
+
+        return gson.fromJson(value, type);
+    }
+}
+```
+
+Similar to Spring, `@Configuration` is used to provide configurations. To specify a custom MessageConverter, you can define your configuration as shown below, within your application:
+
+```java
+@Configuration
+public GsonMessageConverter getGsonConverter() {
+	return new GsonMessageConverter();
+}
 ```
 
 ## Project Management

@@ -1,6 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd.model;
 
 import net.jonathangiles.tools.teenyhttpd.implementation.EmptyResponse;
+import net.jonathangiles.tools.teenyhttpd.implementation.TypedResponseImpl;
 
 public enum StatusCode {
     // https://www.w3.org/Protocols/rfc2616/rfc2616-sec6.html
@@ -62,7 +63,23 @@ public enum StatusCode {
         return fullString;
     }
 
+    public int getCode() {
+        return code;
+    }
+
+    public String getReasonPhrase() {
+        return reasonPhrase;
+    }
+
     public Response asResponse() {
         return new EmptyResponse(this);
+    }
+
+    public <T> TypedResponse<T> asTypedResponse() {
+        return new TypedResponseImpl<>(this, null);
+    }
+
+    public <T> TypedResponse<T> asTypedResponse(T body) {
+        return new TypedResponseImpl<>(this, body);
     }
 }

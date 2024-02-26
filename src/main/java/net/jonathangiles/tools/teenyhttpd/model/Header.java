@@ -3,11 +3,15 @@ package net.jonathangiles.tools.teenyhttpd.model;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Represents a request header.
  */
 public class Header {
+
+    public static final Pattern KEY_PATTERN = Pattern.compile("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$");
+
     private final String keyValue;
     private String key;
     private List<String> values;
@@ -24,6 +28,8 @@ public class Header {
         this.keyValue = null;
         this.key = key;
         this.values = values;
+
+        validateKey(key);
     }
 
     public String getKey() {
@@ -40,6 +46,10 @@ public class Header {
         return values;
     }
 
+    public String getFirstValue() {
+        return getValues().get(0);
+    }
+
     @Override
     public String toString() {
         return getKey() + ": " + String.join(", ", getValues());
@@ -54,5 +64,16 @@ public class Header {
         key = split[0].trim();
         values = Arrays.asList(split[1].split(","));
         values.replaceAll(String::trim);
+    }
+
+    private void validateKey(String key) {
+
+        if (key.isEmpty()) {
+            throw new IllegalArgumentException("key must not be empty");
+        }
+
+        if (!Header.KEY_PATTERN.matcher(key).matches()) {
+            throw new IllegalArgumentException("Invalid header name: " + key);
+        }
     }
 }
