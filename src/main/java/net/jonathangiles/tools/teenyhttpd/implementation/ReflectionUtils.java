@@ -1,7 +1,11 @@
 package net.jonathangiles.tools.teenyhttpd.implementation;
 
+import net.jonathangiles.tools.teenyhttpd.json.JsonAlias;
+
 import java.lang.reflect.*;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public final class ReflectionUtils {
 
@@ -55,6 +59,43 @@ public final class ReflectionUtils {
         }
 
         throw new IllegalStateException("Unknown type: " + actualTypeArgument);
+    }
+
+    public static Map<String, Field> getFields(Class<?> clazz) {
+
+        return Arrays.stream(clazz.getDeclaredFields())
+                .filter(ReflectionUtils::isWritable)
+                .collect(Collectors.toMap(Field::getName, f -> f));
+    }
+
+    public static Map<String, Method> getMutators(Class<?> clazz) {
+        return Arrays.stream(clazz.getDeclaredMethods())
+                .filter(ReflectionUtils::isMutator)
+                .collect(Collectors.toMap(ReflectionUtils::getName, m -> m));
+
+    }
+
+    private static String getName(Method method) {
+
+        if (method.isAnnotationPresent(JsonAlias.class)) {
+            return method.getAnnotation(JsonAlias.class).value();
+        }
+
+        return method.getName().substring(3, 4).toLowerCase()
+                + method.getName().substring(4);
+    }
+
+    private static boolean isMutator(Method method) {
+        return method.getName().startsWith("set") && method.getParameterCount() == 1;
+    }
+
+    private static boolean isWritable(Field field) {
+
+        if (Modifier.isStatic(field.getModifiers())) {
+            return false;
+        }
+
+        return !Modifier.isFinal(field.getModifiers());
     }
 
 }

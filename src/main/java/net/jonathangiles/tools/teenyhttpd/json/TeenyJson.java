@@ -1,21 +1,20 @@
 package net.jonathangiles.tools.teenyhttpd.json;
 
 
-import net.jonathangiles.tools.teenyhttpd.implementation.ParameterType;
 import net.jonathangiles.tools.teenyhttpd.implementation.ReflectionUtils;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.lang.invoke.*;
-import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.Parameter;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -26,427 +25,221 @@ import java.util.stream.Collectors;
  */
 public class TeenyJson {
 
-    private final Map<Class<?>, Mapper> cache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, ValueSerializer> serializers = new ConcurrentHashMap<>();
+    private final JsonEncoder encoder;
+    private final Map<Class<?>, ValueParser<?>> parsers = new ConcurrentHashMap<>();
 
-    public TeenyJson setSerializer(Class<?> clazz, ValueSerializer serializer) {
-        serializers.put(clazz, serializer);
-        return this;
+    public TeenyJson() {
+        encoder = new JsonEncoder();
+    }
+
+    public String writeValueAsString(Object value) {
+        return encoder.writeValueAsString(value);
     }
 
     public void writeValue(BufferedOutputStream baos, Object value) throws IOException {
         baos.write(writeValueAsString(value).getBytes());
     }
 
-    public String writeValueAsString(Object value) {
-        if (value == null) return null;
-        if (value instanceof String) return (String) value;
+    public <T> List<T> readList(String json, Class<T> type) {
+        Object result = new JsonDecoder(json)
+                .read();
 
-        if (value instanceof Collection<?>) {
-            Collection<?> collection = (Collection<?>) value;
-            return "[" + collection.stream()
-                    .map(this::serialize)
-                    .collect(Collectors.joining(", ")) + "]";
+        if (result == null) {
+            return null;
         }
 
-        return serialize(value);
+        List<?> list = (List<?>) result;
 
+        return list.stream()
+                .map(o -> parseObject(o, type))
+                .collect(Collectors.toList());
     }
 
-    public <T> T readValue(String json, Class<T> clazz) {
+    public <T> T readValue(String json, Class<T> type) {
+        Object result = new JsonDecoder(json).read();
 
-        if (json == null || json.isEmpty()) return null;
-
-        if (json.startsWith("[")) {
-            return null;//TODO: implement
+        if (result == null) {
+            return null;
         }
 
-        T instance = ReflectionUtils.newInstance(clazz);
+        return parseObject(result, type);
+    }
 
-        Map<String, Object> tree = jsonToMap(json);
+    public TeenyJson setSerializer(Class<?> clazz, ValueSerializer serializer) {
+        encoder.setSerializer(clazz, serializer);
+        return this;
+    }
 
-        Method[] methods = clazz.getDeclaredMethods();
+    public TeenyJson setParser(Class<?> clazz, ValueParser<?> parser) {
+        parsers.put(clazz, parser);
+        return this;
+    }
 
-        for (Method method : methods) {
-            if (method.isAnnotationPresent(JsonIgnore.class)) continue;
-            if (Modifier.isStatic(method.getModifiers())) continue;
-            if (method.getParameterCount() != 1) continue;
-            if (method.getName().equals("equals")) continue;
+    @SuppressWarnings("unchecked")
+    private <T> T parseObject(Object object, Class<T> type) {
 
-            String fieldName = getFieldName(method);
+        T instance = ReflectionUtils.newInstance(type);
 
-            if (tree.containsKey(fieldName)) {
-                invoke(method, instance, tree.get(fieldName).toString());
-            } else {
-                System.err.println("Field not found: " + fieldName);
+        Map<String, Field> fields = ReflectionUtils.getFields(type);
+        Map<String, Method> mutators = ReflectionUtils.getMutators(type);
+
+        Map<String, Object> map = (Map<String, Object>) object;
+
+        for (Map.Entry<String, Field> entry : fields.entrySet()) {
+
+            Object source = map.get(entry.getKey());
+
+            if (source == null) {
+                continue;
             }
+
+            write(entry.getValue(), mutators.get(entry.getKey()), source, instance);
         }
 
         return instance;
     }
 
-    private Map<String, Object> jsonToMap(String json) {
-        Map<String, Object> map = new HashMap<>();
-
-        String[] split = json.substring(1, json.length() - 1).split(", ");
-
-        for (String property : split) {
-            String[] keyValue = split(property);
-            map.put(cleanUp(keyValue[0]), cleanUp(keyValue[1]));
-        }
-
-        return map;
-    }
-
-    private String cleanUp(String value) {
-        value = value.trim();
-
-        if (value.startsWith("\"")) {
-            return value.substring(1, value.length() - 1);
-        }
-
-        return value;
-    }
-
-    private String[] split(String property) {
-        String key;
-        String value;
-
-        if (property.contains(":")) {
-            key = property.substring(0, property.indexOf(":"));
-            value = property.substring(property.indexOf(":") + 1);
-        } else {
-            key = property;
-            value = "";
-        }
-
-        return new String[]{key, value};
-    }
-
-    private void invoke(Method method, Object parent, String value) {
-        try {
-            method.setAccessible(true);
-            method.invoke(parent, parse(method.getParameters()[0], value));
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            Logger.getLogger(TeenyJson.class.getName())
-                    .log(Level.SEVERE, "Error invoking method: " + method.getName(), e);
-        }
-    }
-
-    @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
-    private Object parseCollection(Class<?> itemType, Collection<?> collection, String values) {
-
-        Collection<Object> resultCollection;
-
-        if (collection instanceof List) {
-            resultCollection = new ArrayList<>();
-        } else if (collection instanceof Set) {
-            resultCollection = new HashSet<>();
-        } else {
-            throw new IllegalArgumentException("Unsupported collection type: " + collection.getClass().getName());
-        }
-
-        String[] split = values.substring(1, values.length() - 1).split(", ");
-
-        for (String value : split) {
-            resultCollection.add(parse(itemType, value));
-        }
-
-        return collection;
-    }
-
-    private Object parse(Parameter parameter, String value) {
-
-        if (Set.class.isAssignableFrom(parameter.getType())) {
-
-            ParameterType type = ReflectionUtils.getParameterType(parameter);
-
-            return parseCollection(type.getType(), new HashSet<>(), value);
-
-        } else if (List.class.isAssignableFrom(parameter.getType())) {
-
-            ParameterType type = ReflectionUtils.getParameterType(parameter);
-
-            return parseCollection(type.getType(), new ArrayList<>(), value);
-
-        }
-
-        return parse(parameter.getType(), value);
-    }
-
-    private Object parse(Class<?> type, String value) {
-
-        if (type.isPrimitive()) {
-            if (type == int.class) return Integer.parseInt(value);
-            if (type == long.class) return Long.parseLong(value);
-            if (type == double.class) return Double.parseDouble(value);
-            if (type == float.class) return Float.parseFloat(value);
-            if (type == boolean.class) return Boolean.parseBoolean(value);
-            if (type == char.class) return value.charAt(0);
-        }
-
-        if (type.getName().startsWith("java")) {
-            if (type == String.class) return value;
-            if (type == Integer.class) return Integer.parseInt(value);
-            if (type == Long.class) return Long.parseLong(value);
-            if (type == Double.class) return Double.parseDouble(value);
-            if (type == Float.class) return Float.parseFloat(value);
-            if (type == Boolean.class) return Boolean.parseBoolean(value);
-            if (type == Character.class) return value.charAt(0);
-            if (type == LocalDate.class) return LocalDate.parse(value);
-            if (type == LocalDateTime.class) return LocalDateTime.parse(value);
-        }
-
-        return readValue(value, type);
-    }
-
-    private String serialize(Object object) {
-
-        Mapper cachedMapper = cache.get(object.getClass());
-
-        if (cachedMapper != null) {
-            return cachedMapper.serialize(object, this);
-        }
-
-        final Class<?> clazz = object.getClass();
-
-        if (clazz.getName()
-                .startsWith("java.lang")) {
-
-            return writeValue(object);
-        }
-
-
-        Method[] methods = clazz.getDeclaredMethods();
-
-        Mapper mapper = new Mapper(clazz);
-        cache.put(clazz, mapper);
-
-        for (Method method : methods) {
-            try {
-
-                if (method.getName().equals("hashCode")) continue;
-
-                mapper.put(method);
-            } catch (Throwable e) {
-                Logger.getLogger(TeenyJson.class.getName())
-                        .log(Level.SEVERE, "Error serializing object: " + object.getClass().getName(), e);
-            }
-
-        }
-
-        return mapper.serialize(object, this);
-    }
-
-    private String writeField(String name, Object value, boolean includeNonNull) {
-
-        StringBuilder builder = new StringBuilder();
+    private void write(Field field, Method method, Object value, Object instance) {
 
 
         try {
 
-            if (includeNonNull && value == null) return null;
-
-            builder.append("\"").append(name).append("\": ");
-
-            if (value instanceof Collection) {
-                builder.append("[");
-
-                String collection = ((Collection<?>) value)
-                        .stream()
-                        .map(this::serialize)
-                        .collect(Collectors.joining(", "));
-
-                builder.append(collection);
-
-                builder.append("]");
-
-                return builder.toString();
+            if (method != null) {
+                method.setAccessible(true);
+                method.invoke(instance, parse(value, method.getParameterTypes()[0]));
+                return;
             }
 
-            builder.append(writeValue(value));
-        } catch (Exception e) {
+            field.setAccessible(true);
+            field.set(instance, parse(value, field.getType()));
+        } catch (Exception ex) {
             Logger.getLogger(TeenyJson.class.getName())
-                    .log(Level.SEVERE, null, e);
+                    .log(Level.SEVERE, "Failed to set field " + field.getName() + " on " + instance.getClass().getName(), ex);
         }
-
-        return builder.toString();
     }
 
-    private static String getFieldName(Method method) {
+    private Object parse(Object value, Class<?> target) {
 
-        if (method.isAnnotationPresent(JsonAlias.class)) {
-            return method.getAnnotation(JsonAlias.class).value();
+        if (target == List.class) {
+
+            List<?> list = (List<?>) value;
+
+            return list.stream()
+                    .map(o -> parse(o, Objects.requireNonNull(ReflectionUtils.getParameterType(target),
+                            "Unable to infer parameter type").getType()))
+                    .collect(Collectors.toList());
         }
 
-        String name = method.getName();
-
-        if (name.startsWith("get") || name.startsWith("set")) {
-            name = name.substring(3);
+        if (target.isPrimitive()) {
+            return parseSimple(value, target);
         }
 
-        if (name.startsWith("is")) {
-            name = name.substring(2);
+
+        if (!target.getName().startsWith("java")) {
+            return parseObject(value, target);
         }
 
-        return name.replace(name.charAt(0), Character.toLowerCase(name.charAt(0)));
+        return parseSimple(value, target);
     }
 
-    private String writeValue(Object value) {
+    private Object parsePrimitive(Object value, Class<?> target) {
+        if (target == int.class) {
 
-        if (value == null) return "null";
+            if (value == null) return 0;
 
-
-        ValueSerializer serializer = serializers.get(value.getClass());
-
-        if (serializer != null) {
-            return serializer.serialize(value);
+            return Integer.parseInt(value.toString());
         }
 
-        if (value instanceof String) {
-            return "\"" + escapeJsonString((String) value) + "\"";
+        if (target == long.class) {
+
+            if (value == null) return 0L;
+
+            return Long.parseLong(value.toString());
         }
 
-        if (value instanceof Number) {
+        if (target == double.class) {
+
+            if (value == null) return 0.0;
+
+            return Double.parseDouble(value.toString());
+        }
+
+        if (target == float.class) {
+
+            if (value == null) return 0.0f;
+
+            return Float.parseFloat(value.toString());
+        }
+
+        if (target == boolean.class) {
+
+            if (value == null) return false;
+
+            return Boolean.parseBoolean(value.toString());
+        }
+
+        throw new IllegalStateException("Unsupported primitive type: " + target.getName());
+    }
+
+    private Object parseSimple(Object value, Class<?> target) {
+
+        if (value == null) {
+            return null;
+        }
+
+        if (target == String.class) {
             return value.toString();
         }
 
-        if (value instanceof Boolean) {
-            return value.toString();
+        if (target.isPrimitive()) {
+            return parsePrimitive(value, target);
         }
 
-        if (value instanceof Character) {
-            return "\"" + value + "\"";
+        if (target == Integer.class) {
+            return Integer.parseInt(value.toString());
         }
 
-        if (value instanceof LocalDate) {
-            return "\"" + value + "\"";
+        if (target == BigDecimal.class) {
+            return new BigDecimal(value.toString());
         }
 
-        if (value instanceof LocalDateTime) {
-            return "\"" + value + "\"";
+        if (target == BigInteger.class) {
+            return new BigInteger(value.toString());
         }
 
-        if (value.getClass().isEnum()) {
-            return "\"" + value + "\"";
+        if (target == Long.class) {
+            return Long.parseLong(value.toString());
         }
 
-        if (!value.getClass().getName().startsWith("java.lang") && !value.getClass().getName().startsWith("java.time")) {
-            return serialize(value);
+        if (target == Double.class) {
+            return Double.parseDouble(value.toString());
         }
 
-        System.err.println("Unknown type: " + value.getClass().getName());
+        if (target == Float.class) {
+            return Float.parseFloat(value.toString());
+        }
+
+        if (target == Boolean.class) {
+            return Boolean.parseBoolean(value.toString());
+        }
+
+        if (target == LocalDateTime.class) {
+            return LocalDateTime.parse(value.toString());
+        }
+
+        if (target == LocalDate.class) {
+            return LocalDate.parse(value.toString());
+        }
+
+        ValueParser<?> parser = parsers.get(target);
+
+        if (parser != null) {
+            return parser.parse(value);
+        }
+
+        System.out.println("not implemented: " + target.getName());
 
         return null;
-    }
-
-    private String escapeJsonString(String s) {
-
-        if (s == null) return null;
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < s.length(); i++) {
-            char ch = s.charAt(i);
-            switch (ch) {
-                case '"':
-                case '\\':
-                    sb.append('\\');
-                    sb.append(ch);
-                    break;
-                case '\b':
-                    sb.append("\\b");
-                    break;
-                case '\f':
-                    sb.append("\\f");
-                    break;
-                case '\n':
-                    sb.append("\\n");
-                    break;
-                case '\r':
-                    sb.append("\\r");
-                    break;
-                case '\t':
-                    sb.append("\\t");
-                    break;
-                default:
-                    if (ch <= 0x1F) {
-                        String ss = Integer.toHexString(ch);
-                        sb.append("\\u");
-                        for (int k = 0; k < 4 - ss.length(); k++) {
-                            sb.append('0');
-                        }
-                        sb.append(ss.toUpperCase());
-                    } else {
-                        sb.append(ch);
-                    }
-            }
-        }
-        return sb.toString();
-    }
-
-    private static class Mapper extends HashMap<String, Function<Object, Object>> {
-
-        private final Class<?> target;
-        private final boolean includeNonNull;
-
-        public Mapper(Class<?> target) {
-            this.target = target;
-            includeNonNull = target.isAnnotationPresent(JsonIncludeNonNull.class);
-        }
-
-        private void put(Method method) throws Throwable {
-
-            if (method.isAnnotationPresent(JsonIgnore.class)) return;
-            if (Modifier.isStatic(method.getModifiers())) return;
-            if (method.getParameterCount() > 0) return;
-
-            String fieldName = getFieldName(method);
-            put(fieldName, createFunction(target, method.getName(), method.getReturnType()));
-        }
-
-        private String serialize(Object object, TeenyJson teenyJson) {
-
-            List<String> properties = new ArrayList<>();
-
-            for (Entry<String, Function<Object, Object>> entry : entrySet()) {
-
-                Object value = entry.getValue().apply(object);
-
-                if (value == null && !includeNonNull) continue;
-
-                String field = teenyJson.writeField(entry.getKey(), value, includeNonNull);
-
-                if (field == null) continue;
-
-                properties.add(field);
-            }
-
-            return "{" + String.join(", ", properties) + "}";
-        }
-    }
-
-    private static Function<Object, Object> createFunction(Class<?> targetClass, String targetMethod, Class<?> targetMethodReturnType) throws Throwable {
-        MethodHandles.Lookup lookup = getLookup(targetClass);
-        MethodHandle virtualMethodHandle = lookup.findVirtual(targetClass, targetMethod, MethodType.methodType(targetMethodReturnType));
-        CallSite site = LambdaMetafactory.metafactory(lookup,
-                "apply",
-                MethodType.methodType(Function.class),
-                MethodType.methodType(Object.class, Object.class),
-                virtualMethodHandle,
-                MethodType.methodType(targetMethodReturnType, targetClass));
-        @SuppressWarnings("unchecked")
-        Function<Object, Object> getterFunction = (Function<Object, Object>) site.getTarget().invokeExact();
-        return getterFunction;
-    }
-
-    private static MethodHandles.Lookup getLookup(Class<?> targetClass) {
-        MethodHandles.Lookup lookupMe = MethodHandles.lookup();
-
-        try {
-            return MethodHandles.privateLookupIn(targetClass, lookupMe);
-        } catch (IllegalAccessException e) {
-            return lookupMe;
-        }
     }
 
 }
