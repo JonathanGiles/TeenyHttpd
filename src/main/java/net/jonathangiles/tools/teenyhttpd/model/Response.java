@@ -50,7 +50,18 @@ public interface Response {
         return Collections.emptyList();
     }
 
-    void setHeader(Header header);
+    Response removeHeader(String key);
+    Response setHeader(Header header);
+
+    Response setHeader(String key, String value);
+
+    Response setHeader(String key, String... values);
+
+    Response addHeader(String key, String ... values);
+
+    Response addHeader(String key, String value);
+
+    Response addHeader(Header header);
 
     void writeBody(BufferedOutputStream dataOut) throws IOException;
 }

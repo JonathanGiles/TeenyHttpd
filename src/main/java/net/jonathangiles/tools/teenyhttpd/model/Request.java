@@ -14,8 +14,8 @@ public interface Request {
     }
 
     static Request create(Method method, String path, QueryParams queryParams, List<Header> headers, Map<String,
-            String> pathParamsMap) {
-        return new SimpleRequest(method, path, queryParams, headers, pathParamsMap);
+            String> pathParamsMap, String body) {
+        return new SimpleRequest(method, path, queryParams, headers, pathParamsMap, body);
     }
 
     static Request create(Method method, String path, QueryParams queryParams, Map<String, Header> headers, Map<String,
@@ -26,6 +26,8 @@ public interface Request {
     Method getMethod();
 
     String getPath();
+
+    String getBody();
 
     /**
      * Returns a read-only Map of headers.

@@ -20,10 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.net.URLDecoder;
+import java.net.*;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -164,8 +161,12 @@ public class TeenyHttpd {
             isRunning = true;
             startLatch.countDown();
             while (isRunning) {
-                final Socket clientSocket = serverSocket.accept();
-                executorService.execute(() -> handleIncomingRequest(clientSocket));
+                try {
+                    final Socket clientSocket = serverSocket.accept();
+                    executorService.execute(() -> handleIncomingRequest(clientSocket));
+                } catch (SocketTimeoutException e) {
+                    System.err.println(e.getMessage());
+                }
             }
         } catch (SocketException e) {
             if (e.getMessage().contains("Socket closed")) {
@@ -200,6 +201,8 @@ public class TeenyHttpd {
 //        }
         System.out.println("TeenyHttp server stopped.");
     }
+
+    private final Pattern numberPattern = Pattern.compile("\\d+");
 
     private void handleIncomingRequest(final Socket clientSocket) {
         boolean isLongRunningConnection = false;
@@ -263,12 +266,28 @@ public class TeenyHttpd {
             // They will be parsed on-demand.
             String line;
             List<Header> headers = new ArrayList<>();
+            int contentLength = -1;
             while (true) {
                 line = in.readLine();
                 if (line == null || line.isEmpty() || "\r\n".equals(line)) {
                     break;
                 }
-                headers.add(new Header(line));
+
+                Header header = new Header(line);
+                headers.add(header);
+
+                if ((method == Method.POST || method == Method.PUT || method == Method.PATCH)
+                        && (line.startsWith("Content-Length") || line.startsWith("content-length"))
+                        && numberPattern.matcher(header.getFirstValue()).matches()) {
+                    contentLength = Integer.parseInt(header.getValues().get(0));
+                }
+            }
+
+            String body = null;
+            if (contentLength > 0) {
+                char[] bodyChars = new char[contentLength];
+                in.read(bodyChars, 0, contentLength);
+                body = new String(bodyChars);
             }
 
             // the request path is a full path, which may include path params within the path (e.g. ':id'), or extra path
@@ -296,7 +315,7 @@ public class TeenyHttpd {
                     }
                 }
 
-                final Request request = Request.create(method, path, queryParams, headers, pathParamsMap);
+                final Request request = Request.create(method, path, queryParams, headers, pathParamsMap, body);
 
                 // This is where we actually call the callback that the user has provided for the given route.
                 // Check if the response should be a streaming type based on the request headers
@@ -478,7 +497,7 @@ public class TeenyHttpd {
             Matcher matcher = tokenPattern.matcher(original);
             while (matcher.find()) {
                 output.append(original, lastIndex, matcher.start())
-                      .append(converter.apply(matcher));
+                        .append(converter.apply(matcher));
                 lastIndex = matcher.end();
             }
             if (lastIndex < original.length()) {
