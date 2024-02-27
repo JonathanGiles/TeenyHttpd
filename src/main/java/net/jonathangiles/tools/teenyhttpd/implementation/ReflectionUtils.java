@@ -4,6 +4,7 @@ import net.jonathangiles.tools.teenyhttpd.json.JsonAlias;
 
 import java.lang.reflect.*;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -36,7 +37,8 @@ public final class ReflectionUtils {
     }
 
     public static ParameterType getParameterType(Type type) {
-        if (type instanceof Class<?>) {
+        if (!(type instanceof ParameterizedType)) {
+            System.out.println("type = " + type);
             return null;
         }
 
@@ -63,22 +65,75 @@ public final class ReflectionUtils {
 
     public static Map<String, Field> getFields(Class<?> clazz) {
 
+        Map<String, Method> methodMap = Arrays.stream(clazz.getDeclaredMethods())
+                .collect(Collectors.toMap(Method::getName, m -> m));
+
         return Arrays.stream(clazz.getDeclaredFields())
                 .filter(ReflectionUtils::isWritable)
-                .collect(Collectors.toMap(Field::getName, f -> f));
+                .collect(Collectors.toMap(field -> getFieldName(field, methodMap), f -> f));
+    }
+
+    private static String getFieldName(Field field, Map<String, Method> methodMap) {
+
+        Method accessorMethod;
+
+        String baseName = field.getName().substring(0, 1).toUpperCase() + field.getName().substring(1);
+
+        if (field.getType() == boolean.class) {
+            accessorMethod = methodMap.get("is" + baseName);
+        } else {
+            accessorMethod = methodMap.get("get" + baseName);
+        }
+
+        if (accessorMethod != null) {
+            JsonAlias jsonAlias = accessorMethod.getAnnotation(JsonAlias.class);
+
+            if (jsonAlias != null) {
+                return jsonAlias.value();
+            }
+        }
+
+        return field.getName();
     }
 
     public static Map<String, Method> getMutators(Class<?> clazz) {
-        return Arrays.stream(clazz.getDeclaredMethods())
-                .filter(ReflectionUtils::isMutator)
-                .collect(Collectors.toMap(ReflectionUtils::getName, m -> m));
+        Map<String, Method> methodMap = Arrays.stream(clazz.getDeclaredMethods())
+                .collect(Collectors.toMap(Method::getName, m -> m));
 
+        Map<String, Method> resultMap = new HashMap<>();
+
+        for (Method method : methodMap.values()) {
+            if (!isMutator(method)) continue;
+
+            String mutatorName = getMutatorName(method, methodMap);
+
+            resultMap.put(mutatorName, method);
+        }
+
+        return resultMap;
     }
 
-    private static String getName(Method method) {
+    /**
+     * Here we seek for the alias key in the accessor method, if it exists.
+     */
+    private static String getMutatorName(Method method, Map<String, Method> methodMap) {
 
-        if (method.isAnnotationPresent(JsonAlias.class)) {
-            return method.getAnnotation(JsonAlias.class).value();
+        String baseName = method.getName().substring(3);
+
+        Method accessorMethod;
+
+        if (method.getParameterTypes()[0] == boolean.class) {
+            accessorMethod = methodMap.get("is" + baseName);
+        } else {
+            accessorMethod = methodMap.get("get" + baseName);
+        }
+
+        if (accessorMethod != null) {
+            JsonAlias jsonAlias = accessorMethod.getAnnotation(JsonAlias.class);
+
+            if (jsonAlias != null) {
+                return jsonAlias.value();
+            }
         }
 
         return method.getName().substring(3, 4).toLowerCase()

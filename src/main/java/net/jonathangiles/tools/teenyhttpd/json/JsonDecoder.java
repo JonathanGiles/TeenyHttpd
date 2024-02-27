@@ -20,7 +20,12 @@ final class JsonDecoder {
         return c == '}' || c == ']';
     }
 
-    public Object read() {
+    /**
+     * Read the JSON string and return the parsed object.
+     *
+     * @return the parsed object which could be null.
+     */
+    synchronized Object read() {
 
         char current = buffer.current();
 
@@ -51,6 +56,11 @@ final class JsonDecoder {
         if (current == 'f' || current == 'F' ||
                 current == 't' || current == 'T') {
             return readBoolean(current);
+        }
+
+        if (current == ' ') {
+            buffer.advanceSpaces();
+            return read();
         }
 
         return null;
@@ -126,9 +136,7 @@ final class JsonDecoder {
     private String readString() {
         StringBuilder result = new StringBuilder();
 
-        while (buffer.current() == ' ') {
-            buffer.next();
-        }
+        buffer.advanceSpaces();
 
         if (buffer.current() == '"') {
             while (buffer.next()) {
@@ -167,6 +175,7 @@ final class JsonDecoder {
                 char temp = buffer.current();
                 if (temp == ':') {
                     buffer.next();
+                    buffer.advanceSpaces();
                     break;
                 }
             }
@@ -188,23 +197,23 @@ final class JsonDecoder {
         private final String json;
         private int index;
 
-        public Buffer(String json) {
+        Buffer(String json) {
             this.json = json;
         }
 
-        public char current() {
+        char current() {
             return json.charAt(index);
         }
 
-        public void back() {
+        void back() {
             index--;
         }
 
-        public char readBefore() {
+        char readBefore() {
             return json.charAt(index - 1);
         }
 
-        public boolean next() {
+        boolean next() {
             if (index + 1 >= json.length()) {
                 return false;
             } else {
@@ -213,7 +222,13 @@ final class JsonDecoder {
             }
         }
 
-        public String next(int i) {
+        void advanceSpaces() {
+            while (json.charAt(index) == ' ') {
+                index++;
+            }
+        }
+
+        String next(int i) {
             String value = json.substring(index, index + i);
 
             index += i;
@@ -221,9 +236,6 @@ final class JsonDecoder {
             return value;
         }
 
-        public boolean hasNext() {
-            return index < json.length();
-        }
     }
 
 }

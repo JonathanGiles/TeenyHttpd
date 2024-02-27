@@ -78,6 +78,7 @@ final class JsonEncoder {
             try {
 
                 if (method.getName().equals("hashCode")) continue;
+                if (method.getName().equals("toString")) continue;
 
                 mapper.put(method);
             } catch (Throwable e) {

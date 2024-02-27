@@ -7,13 +7,13 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,7 +40,18 @@ public class TeenyJson {
         baos.write(writeValueAsString(value).getBytes());
     }
 
-    public <T> List<T> readList(String json, Class<T> type) {
+    /**
+     * Read a JSON string and return a collection of objects of the given type.
+     *
+     * @param collectionType one of List or Set
+     * @param json the JSON string to parse
+     * @return the parsed object which could be null.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public <T, K> K readCollection(String json, Class<? extends Collection> collectionType, Class<T> type) {
+
+        if (json == null) return null;
+
         Object result = new JsonDecoder(json)
                 .read();
 
@@ -50,12 +61,33 @@ public class TeenyJson {
 
         List<?> list = (List<?>) result;
 
-        return list.stream()
-                .map(o -> parseObject(o, type))
-                .collect(Collectors.toList());
+        if (List.class.isAssignableFrom(collectionType)) {
+            return (K) list.stream()
+                    .map(o -> parseObject(o, type))
+                    .collect(Collectors.toList());
+        }
+
+        if (Set.class.isAssignableFrom(collectionType)) {
+            return (K) list.stream()
+                    .map(o -> parseObject(o, type))
+                    .collect(Collectors.toSet());
+        }
+
+        throw new IllegalStateException("Unsupported collection type: " + collectionType.getName());
     }
 
+    /**
+     *
+     * Read a JSON string and return an object of the given type.
+     *
+     * @param json the JSON string to parse
+     * @param type the type of the object to parse
+     *
+     */
     public <T> T readValue(String json, Class<T> type) {
+
+        if (json == null) return null;
+
         Object result = new JsonDecoder(json).read();
 
         if (result == null) {
@@ -65,11 +97,21 @@ public class TeenyJson {
         return parseObject(result, type);
     }
 
+    /**
+     * Register a custom serializer for the given class.
+     *
+     * @param clazz the class to register
+     */
     public TeenyJson setSerializer(Class<?> clazz, ValueSerializer serializer) {
         encoder.setSerializer(clazz, serializer);
         return this;
     }
 
+    /**
+     * Register a custom parser for the given class.
+     *
+     * @param clazz the class to register
+     */
     public TeenyJson setParser(Class<?> clazz, ValueParser<?> parser) {
         parsers.put(clazz, parser);
         return this;
@@ -101,48 +143,75 @@ public class TeenyJson {
 
     private void write(Field field, Method method, Object value, Object instance) {
 
-
         try {
 
             if (method != null) {
                 method.setAccessible(true);
-                method.invoke(instance, parse(value, method.getParameterTypes()[0]));
+                method.invoke(instance, parse(value, method.getGenericParameterTypes()[0]));
                 return;
             }
 
+            // if the method is missing, try to set the field directly
+
             field.setAccessible(true);
             field.set(instance, parse(value, field.getType()));
+
         } catch (Exception ex) {
             Logger.getLogger(TeenyJson.class.getName())
                     .log(Level.SEVERE, "Failed to set field " + field.getName() + " on " + instance.getClass().getName(), ex);
         }
     }
 
-    private Object parse(Object value, Class<?> target) {
+    private Object parse(Object value, Type target) {
 
-        if (target == List.class) {
+        if (target instanceof ParameterizedType) {
 
-            List<?> list = (List<?>) value;
+            ParameterizedType parameterizedType = (ParameterizedType) target;
 
-            return list.stream()
-                    .map(o -> parse(o, Objects.requireNonNull(ReflectionUtils.getParameterType(target),
-                            "Unable to infer parameter type").getType()))
-                    .collect(Collectors.toList());
+            if (parameterizedType.getRawType() == List.class) {
+
+                List<?> list = (List<?>) value;
+
+                return list.stream()
+                        .map(o -> parse(o, Objects.requireNonNull(ReflectionUtils.getParameterType(target),
+                                "Unable to infer parameter type").getType()))
+                        .collect(Collectors.toList());
+            }
+
+            if (parameterizedType.getRawType() == Set.class) {
+
+                List<?> list = (List<?>) value;
+
+                return list.stream()
+                        .map(o -> parse(o, Objects.requireNonNull(ReflectionUtils.getParameterType(target),
+                                "Unable to infer parameter type").getType()))
+                        .collect(Collectors.toSet());
+            }
+
+
+            throw new IllegalStateException("Unsupported parameterized type: " + parameterizedType.getRawType() + " " + target.getClass().getName());
         }
 
-        if (target.isPrimitive()) {
-            return parseSimple(value, target);
+        if (target instanceof Class<?>) {
+
+            Class<?> targetClass = (Class<?>) target;
+
+            if (targetClass.isPrimitive()) {
+                return parseSimple(value, targetClass);
+            }
+
+            if (!targetClass.getName().startsWith("java")) {
+                return parseObject(value, targetClass);
+            }
+
+            return parseSimple(value, targetClass);
         }
 
-
-        if (!target.getName().startsWith("java")) {
-            return parseObject(value, target);
-        }
-
-        return parseSimple(value, target);
+        throw new IllegalStateException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
     }
 
     private Object parsePrimitive(Object value, Class<?> target) {
+
         if (target == int.class) {
 
             if (value == null) return 0;
@@ -181,6 +250,7 @@ public class TeenyJson {
         throw new IllegalStateException("Unsupported primitive type: " + target.getName());
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parseSimple(Object value, Class<?> target) {
 
         if (value == null) {
@@ -231,13 +301,18 @@ public class TeenyJson {
             return LocalDate.parse(value.toString());
         }
 
+        if (target.isEnum()) {
+            return Enum.valueOf((Class<Enum>) target, value.toString());
+        }
+
         ValueParser<?> parser = parsers.get(target);
 
         if (parser != null) {
             return parser.parse(value);
         }
 
-        System.out.println("not implemented: " + target.getName());
+        Logger.getLogger(TeenyJson.class.getName())
+                .log(Level.WARNING, "not implemented: " + target.getName());
 
         return null;
     }
