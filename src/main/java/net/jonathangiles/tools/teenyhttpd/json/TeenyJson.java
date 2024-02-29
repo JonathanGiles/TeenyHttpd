@@ -84,9 +84,14 @@ public class TeenyJson {
      * @param type the type of the object to parse
      *
      */
+    @SuppressWarnings("unchecked")
     public <T> T readValue(String json, Class<T> type) {
 
         if (json == null) return null;
+
+        if (type == String.class) {
+            return (T) json;
+        }
 
         Object result = new JsonDecoder(json).read();
 
@@ -96,6 +101,29 @@ public class TeenyJson {
 
         return parseObject(result, type);
     }
+
+    @SuppressWarnings("unchecked")
+    public <T> T readValue(String json, Type type) {
+
+        if (json == null) return null;
+
+        if (type == String.class) {
+            return (T) json;
+        }
+
+        Object result = new JsonDecoder(json).read();
+
+        if (result == null) {
+            return null;
+        }
+
+        if (type instanceof Class<?>) {
+            return (T) parse(result, type);
+        }
+
+        throw new IllegalStateException("Unsupported type: " + type.getTypeName() + " " + type.getClass().getName());
+    }
+
 
     /**
      * Register a custom serializer for the given class.
@@ -210,41 +238,45 @@ public class TeenyJson {
         throw new IllegalStateException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
     }
 
+    private String trim(Object value) {
+        return value.toString().trim();
+    }
+
     private Object parsePrimitive(Object value, Class<?> target) {
 
         if (target == int.class) {
 
             if (value == null) return 0;
 
-            return Integer.parseInt(value.toString());
+            return Integer.parseInt(trim(value));
         }
 
         if (target == long.class) {
 
             if (value == null) return 0L;
 
-            return Long.parseLong(value.toString());
+            return Long.parseLong(trim(value));
         }
 
         if (target == double.class) {
 
             if (value == null) return 0.0;
 
-            return Double.parseDouble(value.toString());
+            return Double.parseDouble(trim(value));
         }
 
         if (target == float.class) {
 
             if (value == null) return 0.0f;
 
-            return Float.parseFloat(value.toString());
+            return Float.parseFloat(trim(value));
         }
 
         if (target == boolean.class) {
 
             if (value == null) return false;
 
-            return Boolean.parseBoolean(value.toString());
+            return Boolean.parseBoolean(trim(value));
         }
 
         throw new IllegalStateException("Unsupported primitive type: " + target.getName());

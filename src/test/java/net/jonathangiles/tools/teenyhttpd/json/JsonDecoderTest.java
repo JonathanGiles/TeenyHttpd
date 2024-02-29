@@ -349,6 +349,46 @@ public class JsonDecoderTest {
                         new ObjectB("Jonathan", 30,
                                 new ObjectC("John Doe", 23))));
 
+        System.out.println(json);
+
+        ObjectA objectA = new TeenyJson()
+                .readValue(json, ObjectA.class);
+
+        System.out.println(objectA);
+
+        Assertions.assertEquals("Alex", objectA.getName());
+        Assertions.assertEquals(25, objectA.getAge());
+        Assertions.assertTrue(objectA.isDeveloper());
+
+        ObjectB objectB = objectA.getObjectB();
+
+        Assertions.assertEquals("Jonathan", objectB.getName());
+        Assertions.assertEquals(30, objectB.getAge());
+
+        ObjectC objectC = objectB.getObjectC();
+
+        Assertions.assertEquals("John Doe", objectC.getName());
+        Assertions.assertEquals(23, objectC.getAge());
+
+    }
+
+    @Test
+    void testParseFormattedJson() {
+
+        String json = "{\n" +
+                "  \"objectB\": {\n" +
+                "    \"objectC\": {\n" +
+                "      \"name\": \"John Doe\",\n" +
+                "      \"age\": 23\n" +
+                "    },\n" +
+                "    \"name\": \"Jonathan\",\n" +
+                "    \"age\": 30\n" +
+                "  },\n" +
+                "  \"name\": \"Alex\",\n" +
+                "  \"developer\": true,\n" +
+                "  \"age\": 25\n" +
+                "}";
+
         ObjectA objectA = new TeenyJson()
                 .readValue(json, ObjectA.class);
 

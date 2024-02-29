@@ -58,12 +58,16 @@ final class JsonDecoder {
             return readBoolean(current);
         }
 
-        if (current == ' ') {
+        if (shouldSkip(current)) {
             buffer.advanceSpaces();
             return read();
         }
 
         return null;
+    }
+
+    private static boolean shouldSkip(char current) {
+        return current == ' ' || current == '\n' || current == '\t' || current == '\r';
     }
 
     private Object readBoolean(char current) {
@@ -223,7 +227,7 @@ final class JsonDecoder {
         }
 
         void advanceSpaces() {
-            while (json.charAt(index) == ' ') {
+            while (shouldSkip(json.charAt(index))) {
                 index++;
             }
         }

@@ -27,7 +27,6 @@ public class TeenyApplicationTest {
     private static final int TEST_PORT = 8080;
 
 
-
     private static class ProtocolBufferMessageConverter implements MessageConverter {
 
         @Override
@@ -52,7 +51,7 @@ public class TeenyApplicationTest {
         System.setProperty("banner", "false");
 
         TeenyApplication.start()
-                .registerMessageConverter(new GsonMessageConverter())
+                .registerMessageConverter(new TeenyJsonConverter())
                 .registerMessageConverter(new ProtocolBufferMessageConverter())
                 .register(new StoreController());
 
