@@ -1,6 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd.json;
 
 
+import net.jonathangiles.tools.teenyhttpd.implementation.ParameterizedTypeHelper;
 import net.jonathangiles.tools.teenyhttpd.implementation.ReflectionUtils;
 
 import java.io.BufferedOutputStream;
@@ -20,10 +21,9 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
- * 0 dependencies Teeny JSON serializer
- *
+ * A simple JSON serializer and deserializer.
  */
-public class TeenyJson {
+public final class TeenyJson {
 
     private final JsonEncoder encoder;
     private final Map<Class<?>, ValueParser<?>> parsers = new ConcurrentHashMap<>();
@@ -32,12 +32,24 @@ public class TeenyJson {
         encoder = new JsonEncoder();
     }
 
+    /**
+     * Serialize the given object to a JSON string.
+     * @param value the object to serialize
+     * @return the serialized JSON string
+     */
     public String writeValueAsString(Object value) {
         return encoder.writeValueAsString(value);
     }
 
-    public void writeValue(BufferedOutputStream baos, Object value) throws IOException {
-        baos.write(writeValueAsString(value).getBytes());
+    /**
+     * Serialize the given object to a JSON string and write it to the given output stream.
+     * @param outputStream the output stream to write to
+     * @param value the object to serialize
+     * @throws IOException if a problem occurs during writing
+     */
+    public void writeValue(BufferedOutputStream outputStream, Object value) throws IOException {
+        if (value == null) return;
+        outputStream.write(writeValueAsString(value).getBytes());
     }
 
     /**
@@ -48,8 +60,7 @@ public class TeenyJson {
      * @return the parsed object which could be null.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public <T, K> K readCollection(String json, Class<? extends Collection> collectionType, Class<T> type) {
-
+    public <T, K extends Collection> K readCollection(String json, Class<K> collectionType, Class<T> type) {
         if (json == null) return null;
 
         Object result = new JsonDecoder(json)
@@ -86,7 +97,6 @@ public class TeenyJson {
      */
     @SuppressWarnings("unchecked")
     public <T> T readValue(String json, Class<T> type) {
-
         if (json == null) return null;
 
         if (type == String.class) {
@@ -104,9 +114,8 @@ public class TeenyJson {
 
     @SuppressWarnings("unchecked")
     public <T> T readValue(String json, Type type) {
-
         if (json == null) return null;
-
+        //if the type is string, just return the string
         if (type == String.class) {
             return (T) json;
         }
@@ -127,41 +136,45 @@ public class TeenyJson {
 
     /**
      * Register a custom serializer for the given class.
-     *
+     * <p>
      * @param clazz the class to register
      */
-    public TeenyJson setSerializer(Class<?> clazz, ValueSerializer serializer) {
-        encoder.setSerializer(clazz, serializer);
+    public <T> TeenyJson registerSerializer(Class<T> clazz, ValueSerializer<T> serializer) {
+        encoder.registerSerializer(clazz, serializer);
         return this;
     }
 
     /**
      * Register a custom parser for the given class.
-     *
+     * <p>
      * @param clazz the class to register
      */
-    public TeenyJson setParser(Class<?> clazz, ValueParser<?> parser) {
+    public <T> TeenyJson registerParser(Class<T> clazz, ValueParser<T> parser) {
         parsers.put(clazz, parser);
         return this;
     }
 
+    /**
+     * Parses an object into a target type.
+     * @param object the object to parse
+     * @param type the target type
+     * @return the parsed object or null if the object is null
+     * @param <T> the type of the target
+     */
     @SuppressWarnings("unchecked")
     private <T> T parseObject(Object object, Class<T> type) {
+        if (object == null) return null;
 
         T instance = ReflectionUtils.newInstance(type);
 
         Map<String, Field> fields = ReflectionUtils.getFields(type);
         Map<String, Method> mutators = ReflectionUtils.getMutators(type);
-
         Map<String, Object> map = (Map<String, Object>) object;
 
         for (Map.Entry<String, Field> entry : fields.entrySet()) {
-
             Object source = map.get(entry.getKey());
 
-            if (source == null) {
-                continue;
-            }
+            if (source == null) continue;
 
             write(entry.getValue(), mutators.get(entry.getKey()), source, instance);
         }
@@ -169,10 +182,17 @@ public class TeenyJson {
         return instance;
     }
 
+    /**
+     * Writes a value to a field or method of an instance, is something goes wrong logs the error,
+     * but does not throw an exception.
+     * <p>
+     * @param field the field to write if the method is missing
+     * @param method the method to write
+     * @param value the value to write
+     * @param instance the instance to write to
+     */
     private void write(Field field, Method method, Object value, Object instance) {
-
         try {
-
             if (method != null) {
                 method.setAccessible(true);
                 method.invoke(instance, parse(value, method.getGenericParameterTypes()[0]));
@@ -180,7 +200,6 @@ public class TeenyJson {
             }
 
             // if the method is missing, try to set the field directly
-
             field.setAccessible(true);
             field.set(instance, parse(value, field.getType()));
 
@@ -190,34 +209,51 @@ public class TeenyJson {
         }
     }
 
+    /**
+     * Parses a value into a target type.
+     * <p>
+     * @param value the value to parse
+     * @param target the target type
+     * @return the parsed value or null if the value is null or the target type is not supported
+     * @throws IllegalStateException if the target type is not supported
+     */
     private Object parse(Object value, Type target) {
 
         if (target instanceof ParameterizedType) {
 
-            ParameterizedType parameterizedType = (ParameterizedType) target;
+            ParameterizedTypeHelper helper = ReflectionUtils.getParameterType(target);
 
-            if (parameterizedType.getRawType() == List.class) {
+            if (helper.isParentTypeOf(List.class)) {
 
                 List<?> list = (List<?>) value;
 
                 return list.stream()
-                        .map(o -> parse(o, Objects.requireNonNull(ReflectionUtils.getParameterType(target),
-                                "Unable to infer parameter type").getType()))
+                        .map(o -> parse(o, helper.getFirstType()))
                         .collect(Collectors.toList());
             }
 
-            if (parameterizedType.getRawType() == Set.class) {
+            if (helper.isParentTypeOf(List.class)) {
 
                 List<?> list = (List<?>) value;
 
                 return list.stream()
-                        .map(o -> parse(o, Objects.requireNonNull(ReflectionUtils.getParameterType(target),
-                                "Unable to infer parameter type").getType()))
+                        .map(o -> parse(o, helper.getFirstType()))
                         .collect(Collectors.toSet());
             }
 
+            if (helper.isParentTypeOf(Map.class)) {
+                Map<?, ?> map = (Map<?, ?>) value;
+                //json only supports string keys
+                Map<String, Object> result = new HashMap<>();
 
-            throw new IllegalStateException("Unsupported parameterized type: " + parameterizedType.getRawType() + " " + target.getClass().getName());
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    result.put(entry.getKey().toString(), parse(entry.getValue(), helper.getSecondType()));
+                }
+
+                return result;
+            }
+
+            throw new IllegalStateException("Unsupported parameterized type: " + target.getClass().getName());
         }
 
         if (target instanceof Class<?>) {
@@ -238,50 +274,66 @@ public class TeenyJson {
         throw new IllegalStateException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
     }
 
-    private String trim(Object value) {
-        return value.toString().trim();
-    }
 
-    private Object parsePrimitive(Object value, Class<?> target) {
+    /**
+     * Parses a value into a primitive target type such as int, long, double, float, or boolean.
+     * <p>
+     * @param obj the value to parse
+     * @param target the target type
+     * @return the parsed value or the default value for the target type if the value is null
+     * @throws NumberFormatException if the value cannot be parsed into a number if the target is a number
+     * @throws IllegalStateException if the target type is not supported
+     */
+    private Object parsePrimitive(Object obj, Class<?> target) {
+
+        String value = obj == null ? null : obj.toString().trim();
 
         if (target == int.class) {
 
             if (value == null) return 0;
 
-            return Integer.parseInt(trim(value));
+            return Integer.parseInt(value);
         }
 
         if (target == long.class) {
 
             if (value == null) return 0L;
 
-            return Long.parseLong(trim(value));
+            return Long.parseLong(value);
         }
 
         if (target == double.class) {
 
             if (value == null) return 0.0;
 
-            return Double.parseDouble(trim(value));
+            return Double.parseDouble(value);
         }
 
         if (target == float.class) {
 
             if (value == null) return 0.0f;
 
-            return Float.parseFloat(trim(value));
+            return Float.parseFloat(value);
         }
 
         if (target == boolean.class) {
 
             if (value == null) return false;
 
-            return Boolean.parseBoolean(trim(value));
+            return Boolean.parseBoolean(value);
         }
 
         throw new IllegalStateException("Unsupported primitive type: " + target.getName());
     }
 
+    /**
+     * Parses a simple value into a target type.
+     * <p>
+     * @param value the value to parse
+     * @param target the target type
+     * @throws RuntimeException if a problem occurs during parsing
+     * @return the parsed value or null if the value is null or the target type is not supported
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parseSimple(Object value, Class<?> target) {
 

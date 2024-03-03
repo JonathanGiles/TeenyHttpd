@@ -76,7 +76,7 @@ public class JsonEncoderTest {
 
         init = System.nanoTime();
 
-        teenyJson.setSerializer(String.class, (value) -> "\"hi\"");
+        teenyJson.registerSerializer(String.class, (value) -> "\"hi\"");
 
         json = teenyJson.writeValueAsString(person);
 

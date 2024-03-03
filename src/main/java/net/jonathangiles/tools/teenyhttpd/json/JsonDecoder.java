@@ -16,17 +16,12 @@ final class JsonDecoder {
         this.buffer = new Buffer(json);
     }
 
-    private boolean isCloser(char c) {
-        return c == '}' || c == ']';
-    }
-
     /**
      * Read the JSON string and return the parsed object.
      *
      * @return the parsed object which could be null.
      */
     synchronized Object read() {
-
         char current = buffer.current();
 
         if (current == '{') {
@@ -45,7 +40,6 @@ final class JsonDecoder {
                 current == '-' ||
                 current == '+' ||
                 current == '.') {
-
             return readNumber();
         }
 
@@ -71,7 +65,6 @@ final class JsonDecoder {
     }
 
     private Object readBoolean(char current) {
-
         if (current == 't' || current == 'T') {
             return Boolean.parseBoolean(buffer.next(4));
         }
@@ -85,17 +78,18 @@ final class JsonDecoder {
     }
 
     private String readNumber() {
-
         StringBuilder sb = new StringBuilder();
 
         if (buffer.current() != '+') {
             sb.append(buffer.current());
         }
 
-        while (buffer.next()) {
-            char temp = buffer.current();
+        char temp;
 
-            if (isCloser(temp) || temp == ',') {
+        while (buffer.next()) {
+            temp = buffer.current();
+
+            if ((temp == '}' || temp == ']') || temp == ',') {
                 break;
             } else {
                 sb.append(temp);
@@ -108,20 +102,16 @@ final class JsonDecoder {
     }
 
     private List<Object> readArray() {
-
         List<Object> result = new ArrayList<>();
 
         boolean hasNext = true;
         while (hasNext) {
-
             buffer.next();
             if (buffer.current() == ']') {
                 return result;
             }
 
-            Object value = read();
-
-            result.add(value);
+            result.add(read());
 
             if (buffer.current() == ']') {
                 hasNext = false;
@@ -138,8 +128,7 @@ final class JsonDecoder {
     }
 
     private String readString() {
-        StringBuilder result = new StringBuilder();
-
+        StringBuilder sb = new StringBuilder();
         buffer.advanceSpaces();
 
         if (buffer.current() == '"') {
@@ -151,17 +140,16 @@ final class JsonDecoder {
                         break;
                     }
                 }
-                result.append(temp);
+                sb.append(temp);
             }
         } else {
             return "";
         }
 
-        return result.toString();
+        return sb.toString();
     }
 
     private Map<String, Object> readObject() {
-
         Map<String, Object> result = new HashMap<>();
 
         boolean hasNext = true;
@@ -185,7 +173,6 @@ final class JsonDecoder {
             }
 
             result.put(key, read());
-
             buffer.next();
 
             if (buffer.current() == '}') {
@@ -196,7 +183,9 @@ final class JsonDecoder {
         return result;
     }
 
-
+    /**
+     * This class tracks the current index of the JSON string and provides methods to read the string.
+     */
     private static class Buffer {
         private final String json;
         private int index;
@@ -234,7 +223,6 @@ final class JsonDecoder {
 
         String next(int i) {
             String value = json.substring(index, index + i);
-
             index += i;
 
             return value;

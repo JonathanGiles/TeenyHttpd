@@ -12,14 +12,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+
 final class JsonEncoder {
 
     private final Map<Class<?>, Mapper> cache = new ConcurrentHashMap<>();
-    private final Map<Class<?>, ValueSerializer> serializers = new ConcurrentHashMap<>();
+    private final Map<Class<?>, ValueSerializer<?>> serializers = new ConcurrentHashMap<>();
 
-    public JsonEncoder setSerializer(Class<?> clazz, ValueSerializer serializer) {
+    public <T> void registerSerializer(Class<T> clazz, ValueSerializer<T> serializer) {
         serializers.put(clazz, serializer);
-        return this;
     }
 
     public String writeValueAsString(Object value) {
@@ -39,7 +39,6 @@ final class JsonEncoder {
 
 
     private String serialize(Object object) {
-
         Mapper cachedMapper = cache.get(object.getClass());
 
         if (cachedMapper != null) {
@@ -63,9 +62,7 @@ final class JsonEncoder {
 
         final Class<?> clazz = object.getClass();
 
-        if (clazz.getName()
-                .startsWith("java.lang")) {
-
+        if (clazz.getName().startsWith("java.lang")) {
             return writeValue(object);
         }
 
@@ -76,7 +73,6 @@ final class JsonEncoder {
 
         for (Method method : methods) {
             try {
-
                 if (method.getName().equals("hashCode")) continue;
                 if (method.getName().equals("toString")) continue;
 
@@ -85,24 +81,21 @@ final class JsonEncoder {
                 Logger.getLogger(JsonEncoder.class.getName())
                         .log(Level.SEVERE, "Error serializing object: " + object.getClass().getName(), e);
             }
-
         }
 
         return mapper.serialize(object, this);
     }
 
     private String writeField(String name, Object value, boolean includeNonNull) {
-
-        StringBuilder builder = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
         try {
-
             if (includeNonNull && value == null) return null;
 
-            builder.append("\"").append(name).append("\": ");
+            sb.append("\"").append(name).append("\": ");
 
             if (value instanceof Map) {
-                builder.append("{");
+                sb.append("{");
 
                 String map = ((Map<?, ?>) value)
                         .entrySet()
@@ -110,38 +103,34 @@ final class JsonEncoder {
                         .map(entry -> "\"" + entry.getKey() + "\": " + serialize(entry.getValue()))
                         .collect(Collectors.joining(", "));
 
-                builder.append(map)
-                        .append("}");
-
-                return builder.toString();
+                return sb.append(map)
+                        .append("}")
+                        .toString();
             }
 
             if (value instanceof Collection) {
-                builder.append("[");
+                sb.append("[");
 
                 String collection = ((Collection<?>) value)
                         .stream()
                         .map(this::serialize)
                         .collect(Collectors.joining(", "));
 
-                builder.append(collection);
-
-                builder.append("]");
-
-                return builder.toString();
+                return sb.append(collection)
+                        .append("]")
+                        .toString();
             }
 
-            builder.append(writeValue(value));
+            sb.append(writeValue(value));
         } catch (Exception e) {
             Logger.getLogger(JsonEncoder.class.getName())
                     .log(Level.SEVERE, null, e);
         }
 
-        return builder.toString();
+        return sb.toString();
     }
 
     private static String getFieldName(Method method) {
-
         if (method.isAnnotationPresent(JsonAlias.class)) {
             return method.getAnnotation(JsonAlias.class).value();
         }
@@ -159,10 +148,14 @@ final class JsonEncoder {
         return name.replace(name.charAt(0), Character.toLowerCase(name.charAt(0)));
     }
 
+    /**
+     * Writes the value as a valid JSON value.
+     * @param value the value to be written
+     * @return the JSON representation of the value
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private String writeValue(Object value) {
-
         if (value == null) return "null";
-
 
         ValueSerializer serializer = serializers.get(value.getClass());
 
@@ -208,7 +201,6 @@ final class JsonEncoder {
     }
 
     private String escapeJsonString(String s) {
-
         if (s == null) return null;
 
         StringBuilder sb = new StringBuilder();
@@ -252,7 +244,6 @@ final class JsonEncoder {
     }
 
     private static class Mapper extends HashMap<String, Function<Object, Object>> {
-
         private final Class<?> target;
         private final boolean includeNonNull;
 
@@ -262,7 +253,6 @@ final class JsonEncoder {
         }
 
         private void put(Method method) throws Throwable {
-
             if (method.isAnnotationPresent(JsonIgnore.class)) return;
             if (Modifier.isStatic(method.getModifiers())) return;
             if (method.getParameterCount() > 0) return;
@@ -272,17 +262,13 @@ final class JsonEncoder {
         }
 
         private String serialize(Object object, JsonEncoder encoder) {
-
             List<String> properties = new ArrayList<>();
 
             for (Entry<String, Function<Object, Object>> entry : entrySet()) {
 
                 Object value = entry.getValue().apply(object);
-
                 if (value == null && !includeNonNull) continue;
-
                 String field = encoder.writeField(entry.getKey(), value, includeNonNull);
-
                 if (field == null) continue;
 
                 properties.add(field);
