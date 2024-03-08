@@ -1,15 +1,15 @@
 package net.jonathangiles.tools.teenyhttpd.implementation;
 
 import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
+import java.util.Arrays;
 import java.util.Objects;
 
 /** A helper class to hold the type arguments of a parameterized type and provide some utility methods. */
 public final class ParameterizedTypeHelper implements Type {
-
     private final Class<?> firstType;
     private final Class<?> parentType;//nullable
     private final Type[] typeArguments;
-
 
     ParameterizedTypeHelper(Class<?> type) {
         this.firstType = type;
@@ -24,9 +24,18 @@ public final class ParameterizedTypeHelper implements Type {
     }
 
     ParameterizedTypeHelper(Class<?> parentType, Type[] arguments) {
-        this.firstType = (Class<?>) arguments[0];
+        this.firstType = getRealClass(arguments[0]);
         this.parentType = parentType;
         this.typeArguments = arguments;
+    }
+
+    private Class<?> getRealClass(Type type) {
+        if (type instanceof WildcardType) {
+            WildcardType wildcardType = (WildcardType) type;
+            return (Class<?>) wildcardType.getUpperBounds()[0];
+        }
+
+        return (Class<?>) type;
     }
 
     public ParameterizedTypeHelper withFirstType(Class<?> firstType) {
@@ -61,10 +70,19 @@ public final class ParameterizedTypeHelper implements Type {
 
     public Class<?> getSecondType() {
         Objects.requireNonNull(typeArguments, "Type is not a ParameterizedType");
-        return (Class<?>) typeArguments[1];
+        return getRealClass(typeArguments[1]);
     }
 
     public Class<?> getParentType() {
         return parentType;
+    }
+
+    @Override
+    public String toString() {
+        return "ParameterizedTypeHelper{" +
+                "firstType=" + firstType +
+                ", parentType=" + parentType +
+                ", typeArguments=" + Arrays.toString(typeArguments) +
+                '}';
     }
 }

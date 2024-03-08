@@ -210,7 +210,11 @@ public final class TeenyJson {
                     return;
                 }
 
-                method.invoke(instance, parse(value, method.getGenericParameterTypes()[0]));
+                try {
+                    method.invoke(instance, parse(value, method.getGenericParameterTypes()[0]));
+                } catch (JsonParsingException e) {
+                    throw new JsonParsingException("Failed to write field: " + field.getName() + " on " + field.getDeclaringClass(), e);
+                }
                 return;
             }
 
@@ -272,7 +276,8 @@ public final class TeenyJson {
      * @throws JsonParsingException if a problem occurs during parsing
      */
     private Object parseCollectionOrMap(Object value, ParameterizedTypeHelper helper) throws JsonParsingException {
-        if (helper.getParentType() == null) throw new JsonParsingException("Type is not a ParameterizedType");
+        if (helper.getParentType() == null)
+            throw new JsonParsingException("Type is not a ParameterizedType: " + helper);
 
         if (helper.isParentTypeOf(List.class)) {
             List<?> list = (List<?>) value;
@@ -285,7 +290,7 @@ public final class TeenyJson {
             return parsedList;
         }
 
-        if (helper.isParentTypeOf(List.class)) {
+        if (helper.isParentTypeOf(Set.class)) {
             List<?> list = (List<?>) value;
             Set<Object> parsedSet = new HashSet<>();
 

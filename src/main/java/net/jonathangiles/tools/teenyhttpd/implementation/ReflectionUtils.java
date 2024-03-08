@@ -57,27 +57,10 @@ public final class ReflectionUtils {
             return null;
         }
 
-        Type actualTypeArgument = ((ParameterizedType) type)
-                .getActualTypeArguments()[0];
+        ParameterizedType parameterizedType = (ParameterizedType) type;
 
-        if (actualTypeArgument instanceof Class<?>) {
-            return new ParameterizedTypeHelper((Class<?>) actualTypeArgument);
-        }
-
-        if (actualTypeArgument instanceof WildcardType) {
-            WildcardType wildcardType = (WildcardType) actualTypeArgument;
-            return new ParameterizedTypeHelper((Class<?>) wildcardType.getUpperBounds()[0],
-                    (Class<?>) ((ParameterizedType) type).getRawType());
-        }
-
-        if (actualTypeArgument instanceof ParameterizedType) {
-            ParameterizedType parameterizedType = (ParameterizedType) actualTypeArgument;
-
-            return new ParameterizedTypeHelper((Class<?>) parameterizedType.getRawType(),
-                    parameterizedType.getActualTypeArguments());
-        }
-
-        throw new IllegalStateException("Unknown type: " + actualTypeArgument + " " + actualTypeArgument.getClass());
+        return new ParameterizedTypeHelper((Class<?>) parameterizedType.getRawType(),
+                parameterizedType.getActualTypeArguments());
     }
 
     /**
