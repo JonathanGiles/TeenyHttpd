@@ -411,6 +411,39 @@ public class JsonDecoderTest {
     }
 
     @Test
+    void testJsonDeserializeAnnot() {
+        String json = new TeenyJson()
+                .writeValueAsString(new ObjectD()
+                        .setName("Alex")
+                        .setList(List.of(new ObjectC("John Doe", 23),
+                                new ObjectC("Jane Doe", 25),
+                                new ObjectC("John Smith", 30)))
+                        .setC(new ObjectC("John Doe", 23)));
+
+
+        ObjectD objectD = new TeenyJson()
+                .readValue(json, ObjectD.class);
+
+        System.out.println(objectD);
+
+        Assertions.assertEquals("Alex", objectD.getName());
+
+        C c = objectD.getC();
+
+        Assertions.assertEquals("John Doe", c.getName());
+        Assertions.assertEquals(23, c.getAge());
+        Assertions.assertInstanceOf(ObjectC.class, c);
+
+        List<? extends C> list = objectD.getList();
+
+        Assertions.assertEquals(3, list.size());
+
+        for (C c1 : list) {
+            Assertions.assertInstanceOf(ObjectC.class, c1);
+        }
+    }
+
+    @Test
     void testAlias() {
 
         Person person = new Person()

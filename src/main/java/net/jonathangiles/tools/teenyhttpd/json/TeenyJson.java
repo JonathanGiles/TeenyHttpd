@@ -60,7 +60,7 @@ public final class TeenyJson {
      * @return the parsed object which could be null.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public <T, K extends Collection> K readCollection(String json, Class<K> collectionType, Class<T> type) {
+    public <T, K> K readCollection(String json, Class<? extends Collection> collectionType, Class<T> type) {
         if (json == null) return null;
 
         Object result = new JsonDecoder(json)
@@ -113,7 +113,7 @@ public final class TeenyJson {
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T readValue(String json, Type type) {
+    public <T> T readValue(String json, Type type) throws JsonParsingException {
         if (json == null) return null;
         //if the type is string, just return the string
         if (type == String.class) {
@@ -130,7 +130,7 @@ public final class TeenyJson {
             return (T) parse(result, type);
         }
 
-        throw new IllegalStateException("Unsupported type: " + type.getTypeName() + " " + type.getClass().getName());
+        throw new JsonParsingException("Unsupported type: " + type.getTypeName() + " " + type.getClass().getName());
     }
 
 
@@ -195,6 +195,21 @@ public final class TeenyJson {
         try {
             if (method != null) {
                 method.setAccessible(true);
+
+                if (method.isAnnotationPresent(JsonDeserialize.class)) {
+                    JsonDeserialize annotation = method.getAnnotation(JsonDeserialize.class);
+
+                    if (annotation.as() != Object.class) {
+                        method.invoke(instance, parse(value, annotation.as()));
+                    } else if (annotation.contentAs() != Object.class) {
+                        ParameterizedTypeHelper helper = ReflectionUtils.getParameterType(method.getGenericParameterTypes()[0]);
+                        helper = helper.withFirstType(annotation.contentAs());
+                        method.invoke(instance, parse(value, helper));
+                    }
+
+                    return;
+                }
+
                 method.invoke(instance, parse(value, method.getGenericParameterTypes()[0]));
                 return;
             }
@@ -216,49 +231,23 @@ public final class TeenyJson {
      * @param target the target type
      * @return the parsed value or null if the value is null or the target type is not supported
      * @throws IllegalStateException if the target type is not supported
+     * @throws JsonParsingException if a problem occurs during parsing
      */
-    private Object parse(Object value, Type target) {
-
+    private Object parse(Object value, Type target) throws JsonParsingException {
         if (target instanceof ParameterizedType) {
+            return parseCollectionOrMap(value, ReflectionUtils.getParameterType(target));
+        }
 
-            ParameterizedTypeHelper helper = ReflectionUtils.getParameterType(target);
-
-            if (helper.isParentTypeOf(List.class)) {
-
-                List<?> list = (List<?>) value;
-
-                return list.stream()
-                        .map(o -> parse(o, helper.getFirstType()))
-                        .collect(Collectors.toList());
-            }
-
-            if (helper.isParentTypeOf(List.class)) {
-
-                List<?> list = (List<?>) value;
-
-                return list.stream()
-                        .map(o -> parse(o, helper.getFirstType()))
-                        .collect(Collectors.toSet());
-            }
-
-            if (helper.isParentTypeOf(Map.class)) {
-                Map<?, ?> map = (Map<?, ?>) value;
-                //json only supports string keys
-                Map<String, Object> result = new HashMap<>();
-
-                for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    result.put(entry.getKey().toString(), parse(entry.getValue(), helper.getSecondType()));
-                }
-
-                return result;
-            }
-
-            throw new IllegalStateException("Unsupported parameterized type: " + target.getClass().getName());
+        if (target instanceof ParameterizedTypeHelper) {
+            return parseCollectionOrMap(value, (ParameterizedTypeHelper) target);
         }
 
         if (target instanceof Class<?>) {
-
             Class<?> targetClass = (Class<?>) target;
+
+            if (targetClass.isInterface()) {
+                throw new JsonParsingException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
+            }
 
             if (targetClass.isPrimitive()) {
                 return parseSimple(value, targetClass);
@@ -271,7 +260,55 @@ public final class TeenyJson {
             return parseSimple(value, targetClass);
         }
 
-        throw new IllegalStateException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
+        throw new JsonParsingException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
+    }
+
+    /**
+     * Parses a value into a collection or map.
+     *
+     * @param value the value to parse
+     * @param helper the parameterized type helper
+     * @return the parsed value or null if the value is null or the target type is not supported
+     * @throws JsonParsingException if a problem occurs during parsing
+     */
+    private Object parseCollectionOrMap(Object value, ParameterizedTypeHelper helper) throws JsonParsingException {
+        if (helper.getParentType() == null) throw new JsonParsingException("Type is not a ParameterizedType");
+
+        if (helper.isParentTypeOf(List.class)) {
+            List<?> list = (List<?>) value;
+            List<Object> parsedList = new ArrayList<>();
+
+            for (Object o : list) {
+                parsedList.add(parse(o, helper.getFirstType()));
+            }
+
+            return parsedList;
+        }
+
+        if (helper.isParentTypeOf(List.class)) {
+            List<?> list = (List<?>) value;
+            Set<Object> parsedSet = new HashSet<>();
+
+            for (Object o : list) {
+                parsedSet.add(parse(o, helper.getFirstType()));
+            }
+
+            return parsedSet;
+        }
+
+        if (helper.isParentTypeOf(Map.class)) {
+            Map<?, ?> map = (Map<?, ?>) value;
+            //json only supports string keys
+            Map<String, Object> result = new HashMap<>();
+
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                result.put(entry.getKey().toString(), parse(entry.getValue(), helper.getSecondType()));
+            }
+
+            return result;
+        }
+
+        throw new JsonParsingException("Unsupported parameterized type: " + helper.getParentType());
     }
 
 
@@ -285,32 +322,27 @@ public final class TeenyJson {
      * @throws IllegalStateException if the target type is not supported
      */
     private Object parsePrimitive(Object obj, Class<?> target) {
-
         String value = obj == null ? null : obj.toString().trim();
 
         if (target == int.class) {
-
             if (value == null) return 0;
 
             return Integer.parseInt(value);
         }
 
         if (target == long.class) {
-
             if (value == null) return 0L;
 
             return Long.parseLong(value);
         }
 
         if (target == double.class) {
-
             if (value == null) return 0.0;
 
             return Double.parseDouble(value);
         }
 
         if (target == float.class) {
-
             if (value == null) return 0.0f;
 
             return Float.parseFloat(value);
@@ -336,7 +368,6 @@ public final class TeenyJson {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parseSimple(Object value, Class<?> target) {
-
         if (value == null) {
             return null;
         }

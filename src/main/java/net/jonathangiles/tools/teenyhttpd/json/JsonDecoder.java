@@ -21,7 +21,7 @@ final class JsonDecoder {
      *
      * @return the parsed object which could be null.
      */
-    synchronized Object read() {
+    Object read() {
         char current = buffer.current();
 
         if (current == '{') {

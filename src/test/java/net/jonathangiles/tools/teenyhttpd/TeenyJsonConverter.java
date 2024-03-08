@@ -30,6 +30,10 @@ public class TeenyJsonConverter implements MessageConverter {
 
     @Override
     public Object read(String value, Type type) {
-        return teenyJson.readValue(value, type);
+        try {
+            return teenyJson.readValue(value, type);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

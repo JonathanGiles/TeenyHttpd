@@ -4,11 +4,12 @@ import java.lang.reflect.Type;
 import java.util.Objects;
 
 /** A helper class to hold the type arguments of a parameterized type and provide some utility methods. */
-public final class ParameterizedTypeHelper {
+public final class ParameterizedTypeHelper implements Type {
 
     private final Class<?> firstType;
     private final Class<?> parentType;//nullable
     private final Type[] typeArguments;
+
 
     ParameterizedTypeHelper(Class<?> type) {
         this.firstType = type;
@@ -16,10 +17,34 @@ public final class ParameterizedTypeHelper {
         this.typeArguments = null;
     }
 
+    public ParameterizedTypeHelper(Class<?> firstType, Class<?> parentType) {
+        this.firstType = firstType;
+        this.parentType = parentType;
+        this.typeArguments = null;
+    }
+
     ParameterizedTypeHelper(Class<?> parentType, Type[] arguments) {
         this.firstType = (Class<?>) arguments[0];
         this.parentType = parentType;
         this.typeArguments = arguments;
+    }
+
+    public ParameterizedTypeHelper withFirstType(Class<?> firstType) {
+        if (typeArguments == null) {
+            return new ParameterizedTypeHelper(firstType, parentType);
+        }
+
+        Type[] args = new Type[typeArguments.length];
+
+        args[0] = firstType;
+        System.arraycopy(typeArguments, 1, args, 1, typeArguments.length - 1);
+
+        return new ParameterizedTypeHelper(parentType, args);
+    }
+
+    @Override
+    public String getTypeName() {
+        return getClass().getSimpleName();
     }
 
     public boolean isParentTypeOf(Class<?> type) {

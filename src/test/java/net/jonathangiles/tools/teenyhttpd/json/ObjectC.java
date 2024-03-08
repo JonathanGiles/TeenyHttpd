@@ -1,6 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd.json;
 
-public class ObjectC {
+public class ObjectC implements C {
 
     String name;
     int age;

@@ -13,15 +13,29 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 
+/**
+ * A simple JSON encoder that can serialize objects to a JSON string.
+ */
 final class JsonEncoder {
 
     private final Map<Class<?>, Mapper> cache = new ConcurrentHashMap<>();
     private final Map<Class<?>, ValueSerializer<?>> serializers = new ConcurrentHashMap<>();
 
+    /**
+     * Registers a serializer for a specific class.
+     *
+     * @param clazz the class to register
+     */
     public <T> void registerSerializer(Class<T> clazz, ValueSerializer<T> serializer) {
         serializers.put(clazz, serializer);
     }
 
+    /**
+     * Writes an object to a JSON string.
+     *
+     * @param value the object to be written
+     * @return the JSON string
+     */
     public String writeValueAsString(Object value) {
         if (value == null) return null;
         if (value instanceof String) return (String) value;
@@ -38,6 +52,12 @@ final class JsonEncoder {
     }
 
 
+    /**
+     * Serializes an object to a JSON string.
+     *
+     * @param object the object to be serialized
+     * @return the JSON string
+     */
     private String serialize(Object object) {
         Mapper cachedMapper = cache.get(object.getClass());
 
@@ -86,6 +106,14 @@ final class JsonEncoder {
         return mapper.serialize(object, this);
     }
 
+    /**
+     * Writes a field to a JSON string.
+     *
+     * @param name the name of the field
+     * @param value the value of the field
+     * @param includeNonNull whether to include null values or not
+     * @return the JSON representation of the field
+     */
     private String writeField(String name, Object value, boolean includeNonNull) {
         StringBuilder sb = new StringBuilder();
 
@@ -130,9 +158,20 @@ final class JsonEncoder {
         return sb.toString();
     }
 
+    /**
+     * Gets the field name of a method.
+     * If the method is annotated with {@link JsonAlias}, the value of the annotation is returned.
+     *
+     * @param method the method to get the field name from
+     * @return the field name
+     */
     private static String getFieldName(Method method) {
         if (method.isAnnotationPresent(JsonAlias.class)) {
-            return method.getAnnotation(JsonAlias.class).value();
+            String alias = method.getAnnotation(JsonAlias.class).value();
+
+            if (!alias.isEmpty()) {
+                return alias;
+            }
         }
 
         String name = method.getName();
@@ -200,6 +239,12 @@ final class JsonEncoder {
         return null;
     }
 
+    /**
+     * Escapes a string to be a valid JSON string.
+     *
+     * @param s the string to be escaped
+     * @return the escaped string
+     */
     private String escapeJsonString(String s) {
         if (s == null) return null;
 
@@ -243,6 +288,11 @@ final class JsonEncoder {
         return sb.toString();
     }
 
+    /**
+     * This class holds all lambdas to call the getter methods of a class.
+     * It also holds the target class and a flag to include or not null values.
+     * It is used to serialize an object to a JSON string.
+     */
     private static class Mapper extends HashMap<String, Function<Object, Object>> {
         private final Class<?> target;
         private final boolean includeNonNull;
@@ -261,6 +311,12 @@ final class JsonEncoder {
             put(fieldName, createFunction(target, method.getName(), method.getReturnType()));
         }
 
+        /**
+         * Serializes an object to a JSON string.
+         * @param object the object to be serialized
+         * @param encoder the encoder to be used
+         * @return the JSON string
+         */
         private String serialize(Object object, JsonEncoder encoder) {
             List<String> properties = new ArrayList<>();
 
@@ -278,6 +334,15 @@ final class JsonEncoder {
         }
     }
 
+    /**
+     * Creates a function to call the getter method of a class.
+     *
+     * @param targetClass the class to create the function for
+     * @param targetMethod the method to call
+     * @param targetMethodReturnType the return type of the method
+     * @return the function to call the method
+     * @throws Throwable if an error occurs while creating the function
+     */
     private static Function<Object, Object> createFunction(Class<?> targetClass, String targetMethod, Class<?> targetMethodReturnType) throws Throwable {
         try {
             MethodHandles.Lookup lookup = getLookup(targetClass);
@@ -296,6 +361,13 @@ final class JsonEncoder {
         }
     }
 
+    /**
+     * Gets the lookup object for a class.
+     * If the class is not accessible, a private lookup is created.
+     *
+     * @param targetClass the class to get the lookup for
+     * @return the lookup object
+     */
     private static MethodHandles.Lookup getLookup(Class<?> targetClass) {
         MethodHandles.Lookup lookupMe = MethodHandles.lookup();
 
