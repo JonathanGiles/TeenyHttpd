@@ -1,7 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd.json;
 
 public class ObjectC implements C {
-
     String name;
     int age;
 
@@ -27,6 +26,24 @@ public class ObjectC implements C {
 
     public void setAge(int age) {
         this.age = age;
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+
+        ObjectC objectC = (ObjectC) object;
+
+        if (getAge() != objectC.getAge()) return false;
+        return getName().equals(objectC.getName());
+    }
+
+    @Override
+    public int hashCode() {
+        int result = getName().hashCode();
+        result = 31 * result + getAge();
+        return result;
     }
 
     @Override

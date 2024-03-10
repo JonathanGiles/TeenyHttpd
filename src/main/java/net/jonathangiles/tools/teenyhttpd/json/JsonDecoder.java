@@ -44,7 +44,8 @@ final class JsonDecoder {
         }
 
         if (current == 'n' || current == 'N') {
-            return readNull();
+            buffer.next(4);
+            return null;
         }
 
         if (current == 'f' || current == 'F' ||
@@ -70,11 +71,6 @@ final class JsonDecoder {
         }
 
         return Boolean.parseBoolean(buffer.next(5));
-    }
-
-    private Object readNull() {
-        buffer.next(4);
-        return null;
     }
 
     private String readNumber() {

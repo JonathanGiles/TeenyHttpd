@@ -3,8 +3,10 @@ package net.jonathangiles.tools.teenyhttpd.json;
 import java.lang.invoke.*;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -20,6 +22,11 @@ final class JsonEncoder {
 
     private final Map<Class<?>, Mapper> cache = new ConcurrentHashMap<>();
     private final Map<Class<?>, ValueSerializer<?>> serializers = new ConcurrentHashMap<>();
+    private SimpleDateFormat dateFormatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+
+    SimpleDateFormat getDateFormatter() {
+        return dateFormatter;
+    }
 
     /**
      * Registers a serializer for a specific class.
@@ -76,6 +83,13 @@ final class JsonEncoder {
         if (object instanceof Collection) {
             Collection<?> list = (Collection<?>) object;
             return "[" + list.stream()
+                    .map(this::serialize)
+                    .collect(Collectors.joining(", ")) + "]";
+        }
+
+        if (object.getClass().isArray()) {
+            Object[] array = (Object[]) object;
+            return "[" + Arrays.stream(array)
                     .map(this::serialize)
                     .collect(Collectors.joining(", ")) + "]";
         }
@@ -184,7 +198,7 @@ final class JsonEncoder {
             name = name.substring(2);
         }
 
-        return name.replace(name.charAt(0), Character.toLowerCase(name.charAt(0)));
+        return name.substring(0, 1).toLowerCase() + name.substring(1);
     }
 
     /**
@@ -214,6 +228,10 @@ final class JsonEncoder {
             return value.toString();
         }
 
+        if (value instanceof Date) {
+            return "\"" + dateFormatter.format(value) + "\"";
+        }
+
         if (value instanceof Character) {
             return "\"" + value + "\"";
         }
@@ -223,6 +241,10 @@ final class JsonEncoder {
         }
 
         if (value instanceof LocalDateTime) {
+            return "\"" + value + "\"";
+        }
+
+        if (value instanceof LocalTime) {
             return "\"" + value + "\"";
         }
 

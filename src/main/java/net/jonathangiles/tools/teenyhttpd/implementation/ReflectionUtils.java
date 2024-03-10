@@ -64,6 +64,37 @@ public final class ReflectionUtils {
     }
 
     /**
+     * Returns the component type of the given type.
+     *
+     * @param type the type to get the component type from
+     * @return the component type of the given type or null if the type is not an array
+     */
+    public static Class<?> getArrayType(Type type) {
+        if (type instanceof GenericArrayType) {
+            return (Class<?>) ((GenericArrayType) type).getGenericComponentType();
+        }
+
+        if (type instanceof Class<?>) {
+            return ((Class<?>) type).getComponentType();
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns the component type of the given type.
+     *
+     * @param type the type to get the component type from
+     * @return the component type of the given type or null if the type is not an array
+     */
+    public static boolean isEnum(Type type) {
+        if (type instanceof Class<?>) {
+            return ((Class<?>) type).isEnum();
+        }
+        return false;
+    }
+
+    /**
      * Returns a map of the writable fields of the given class,
      * where the key is the name of the field or his alias and the value is the field itself.
      * <p>
@@ -106,6 +137,14 @@ public final class ReflectionUtils {
                 + method.getName().substring(4);
     }
 
+    /**
+     * Here we seek for the alias key in the accessor method, if it exists.
+     *
+     * @param methodMap current method map
+     * @param baseName base name of the method
+     * @param type type of the method
+     * @return alias key in the accessor method, if it exists
+     */
     private static String findAlias(Map<String, Method> methodMap, String baseName, Class<?> type) {
         Method accessorMethod;
 
@@ -151,10 +190,22 @@ public final class ReflectionUtils {
     }
 
 
+    /**
+     * Checks if the given method is a mutator.
+     *
+     * @param method the method to check
+     * @return true if the method is a mutator, false otherwise
+     */
     private static boolean isMutator(Method method) {
         return method.getName().startsWith("set") && method.getParameterCount() == 1;
     }
 
+    /**
+     * Checks if the given field is writable.
+     *
+     * @param field the field to check
+     * @return true if the field is writable, false otherwise
+     */
     private static boolean isWritable(Field field) {
         if (Modifier.isStatic(field.getModifiers())) {
             return false;

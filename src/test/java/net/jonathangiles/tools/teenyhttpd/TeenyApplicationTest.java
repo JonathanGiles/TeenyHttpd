@@ -51,7 +51,6 @@ public class TeenyApplicationTest {
         System.setProperty("banner", "false");
 
         TeenyApplication.start()
-                .registerMessageConverter(new TeenyJsonConverter())
                 .registerMessageConverter(new ProtocolBufferMessageConverter())
                 .register(new StoreController());
 

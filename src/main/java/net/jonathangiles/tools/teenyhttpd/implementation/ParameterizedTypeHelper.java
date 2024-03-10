@@ -11,12 +11,6 @@ public final class ParameterizedTypeHelper implements Type {
     private final Class<?> parentType;//nullable
     private final Type[] typeArguments;
 
-    ParameterizedTypeHelper(Class<?> type) {
-        this.firstType = type;
-        this.parentType = null;
-        this.typeArguments = null;
-    }
-
     public ParameterizedTypeHelper(Class<?> firstType, Class<?> parentType) {
         this.firstType = firstType;
         this.parentType = parentType;
@@ -29,6 +23,12 @@ public final class ParameterizedTypeHelper implements Type {
         this.typeArguments = arguments;
     }
 
+    /**
+     * Returns the real class of the given type.
+     *
+     * @param type the type to get the real class of
+     * @return the real class of the given type
+     */
     private Class<?> getRealClass(Type type) {
         if (type instanceof WildcardType) {
             WildcardType wildcardType = (WildcardType) type;
@@ -38,6 +38,12 @@ public final class ParameterizedTypeHelper implements Type {
         return (Class<?>) type;
     }
 
+    /**
+     * Returns a new instance of ParameterizedTypeHelper with the given first type.
+     *
+     * @param firstType the first type
+     * @return a new instance of ParameterizedTypeHelper
+     */
     public ParameterizedTypeHelper withFirstType(Class<?> firstType) {
         if (typeArguments == null) {
             return new ParameterizedTypeHelper(firstType, parentType);
@@ -57,7 +63,7 @@ public final class ParameterizedTypeHelper implements Type {
     }
 
     public boolean isParentTypeOf(Class<?> type) {
-        return parentType != null && parentType.isAssignableFrom(type);
+        return parentType != null && type.isAssignableFrom(parentType);
     }
 
     public Type[] getTypeArguments() {
@@ -68,6 +74,10 @@ public final class ParameterizedTypeHelper implements Type {
         return firstType;
     }
 
+    /**
+     * @return the second type of the parameterized type
+     * @throws NullPointerException if the type is not a ParameterizedType
+     */
     public Class<?> getSecondType() {
         Objects.requireNonNull(typeArguments, "Type is not a ParameterizedType");
         return getRealClass(typeArguments[1]);

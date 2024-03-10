@@ -12,8 +12,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -139,6 +141,7 @@ public final class TeenyJson {
      * <p>
      * @param clazz the class to register
      */
+    @SuppressWarnings("UnusedReturnValue")
     public <T> TeenyJson registerSerializer(Class<T> clazz, ValueSerializer<T> serializer) {
         encoder.registerSerializer(clazz, serializer);
         return this;
@@ -149,6 +152,7 @@ public final class TeenyJson {
      * <p>
      * @param clazz the class to register
      */
+    @SuppressWarnings("unused")
     public <T> TeenyJson registerParser(Class<T> clazz, ValueParser<T> parser) {
         parsers.put(clazz, parser);
         return this;
@@ -237,6 +241,7 @@ public final class TeenyJson {
      * @throws IllegalStateException if the target type is not supported
      * @throws JsonParsingException if a problem occurs during parsing
      */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parse(Object value, Type target) throws JsonParsingException {
         if (target instanceof ParameterizedType) {
             return parseCollectionOrMap(value, ReflectionUtils.getParameterType(target));
@@ -257,6 +262,14 @@ public final class TeenyJson {
                 return parseSimple(value, targetClass);
             }
 
+            if (targetClass.isArray()) {
+                return parseArray(value, ReflectionUtils.getArrayType(target));
+            }
+
+            if (ReflectionUtils.isEnum(targetClass)) {
+                return Enum.valueOf((Class<Enum>) target, value.toString());
+            }
+
             if (!targetClass.getName().startsWith("java")) {
                 return parseObject(value, targetClass);
             }
@@ -267,6 +280,20 @@ public final class TeenyJson {
         throw new JsonParsingException("Unsupported type: " + target.getTypeName() + " " + target.getClass().getName());
     }
 
+    private Object parseArray(Object value, Class<?> componentType) throws JsonParsingException {
+        if (value == null) return null;
+
+        List<?> list = (List<?>) value;
+
+        Object array = java.lang.reflect.Array.newInstance(componentType, list.size());
+
+        for (int i = 0; i < list.size(); i++) {
+            java.lang.reflect.Array.set(array, i, parse(list.get(i), componentType));
+        }
+
+        return array;
+    }
+
     /**
      * Parses a value into a collection or map.
      *
@@ -275,13 +302,20 @@ public final class TeenyJson {
      * @return the parsed value or null if the value is null or the target type is not supported
      * @throws JsonParsingException if a problem occurs during parsing
      */
+    @SuppressWarnings("unchecked")
     private Object parseCollectionOrMap(Object value, ParameterizedTypeHelper helper) throws JsonParsingException {
         if (helper.getParentType() == null)
             throw new JsonParsingException("Type is not a ParameterizedType: " + helper);
 
         if (helper.isParentTypeOf(List.class)) {
             List<?> list = (List<?>) value;
-            List<Object> parsedList = new ArrayList<>();
+            List<Object> parsedList;
+
+            if (helper.getParentType() == ArrayList.class || helper.getParentType() == List.class) {
+                parsedList = new ArrayList<>();
+            } else {
+                parsedList = (List<Object>) ReflectionUtils.newInstance(helper.getParentType());
+            }
 
             for (Object o : list) {
                 parsedList.add(parse(o, helper.getFirstType()));
@@ -292,7 +326,13 @@ public final class TeenyJson {
 
         if (helper.isParentTypeOf(Set.class)) {
             List<?> list = (List<?>) value;
-            Set<Object> parsedSet = new HashSet<>();
+            Set<Object> parsedSet;
+
+            if (helper.getParentType() == HashSet.class || helper.getParentType() == Set.class) {
+                parsedSet = new HashSet<>();
+            } else {
+                parsedSet = (Set<Object>) ReflectionUtils.newInstance(helper.getParentType());
+            }
 
             for (Object o : list) {
                 parsedSet.add(parse(o, helper.getFirstType()));
@@ -419,6 +459,19 @@ public final class TeenyJson {
 
         if (target == LocalDate.class) {
             return LocalDate.parse(value.toString());
+        }
+
+        if (target == LocalTime.class) {
+            return LocalTime.parse(value.toString());
+        }
+
+        if (target == Date.class) {
+            try {
+                return encoder.getDateFormatter()
+                        .parse(value.toString());
+            } catch (ParseException e) {
+                return null;
+            }
         }
 
         if (target.isEnum()) {
