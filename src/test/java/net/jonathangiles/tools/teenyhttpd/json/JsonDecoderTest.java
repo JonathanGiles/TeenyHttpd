@@ -312,6 +312,8 @@ public class JsonDecoderTest {
                         new ObjectB("Jonathan", 30,
                                 new ObjectC("John Doe", 23))));
 
+        System.out.println(json);
+
         ObjectA objectA = new TeenyJson()
                 .readValue(json, ObjectA.class);
 
@@ -341,7 +343,17 @@ public class JsonDecoderTest {
                         new ObjectB("Jonathan", 30,
                                 new ObjectC("John Doe", 23))));
 
+        String json2 = new Gson()
+                .toJson(new ObjectA("Alex", 25,
+                        true, null,
+                        new ObjectB("Jonathan", 30,
+                                new ObjectC("John Doe", 23))));
+
         System.out.println(json);
+        System.out.println(json2);
+
+        Assertions.assertEquals(json.length(), json2.length());
+
 
         ObjectA objectA = new TeenyJson()
                 .readValue(json, ObjectA.class);
@@ -379,6 +391,8 @@ public class JsonDecoderTest {
                 "  \"developer\": true,\n" +
                 "  \"age\": 25\n" +
                 "}";
+
+        System.out.println("Json: " + json);
 
         ObjectA objectA = new TeenyJson()
                 .readValue(json, ObjectA.class);
@@ -508,7 +522,7 @@ public class JsonDecoderTest {
         String json = new TeenyJson()
                 .writeValueAsString(complexObject);
 
-        System.out.println(json);
+        System.out.println("JSON: " + json);
 
         ComplexObject object = new TeenyJson()
                 .readValue(json, ComplexObject.class);

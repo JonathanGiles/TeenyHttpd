@@ -66,6 +66,8 @@ final class JsonEncoder {
      * @return the JSON string
      */
     private String serialize(Object object) {
+        if (object == null) return "null";
+
         Mapper cachedMapper = cache.get(object.getClass());
 
         if (cachedMapper != null) {
@@ -76,22 +78,19 @@ final class JsonEncoder {
             Map<?, ?> map = (Map<?, ?>) object;
             return "{" + map.entrySet()
                     .stream()
-                    .map(entry -> "\"" + entry.getKey() + "\": " + serialize(entry.getValue()))
-                    .collect(Collectors.joining(", ")) + "}";
+                    .map(entry -> "\"" + entry.getKey() + "\":" + serialize(entry.getValue()))
+                    .collect(Collectors.joining(",")) + "}";
         }
 
         if (object instanceof Collection) {
             Collection<?> list = (Collection<?>) object;
             return "[" + list.stream()
                     .map(this::serialize)
-                    .collect(Collectors.joining(", ")) + "]";
+                    .collect(Collectors.joining(",")) + "]";
         }
 
         if (object.getClass().isArray()) {
-            Object[] array = (Object[]) object;
-            return "[" + Arrays.stream(array)
-                    .map(this::serialize)
-                    .collect(Collectors.joining(", ")) + "]";
+            return serializeArray(object);
         }
 
         final Class<?> clazz = object.getClass();
@@ -121,6 +120,52 @@ final class JsonEncoder {
     }
 
     /**
+     * Serializes an array to a JSON string.
+     *
+     * <p>This method handles both arrays of objects and arrays of primitives.
+     * For arrays of objects, it serializes each object in the array and joins them with a comma.
+     * For arrays of primitives, it converts the array to a string representation.
+     *
+     * @param object the array to be serialized, which can be an array of objects or an array of primitives
+     * @return the JSON string representation of the array
+     * @throws IllegalArgumentException if the array is of a type that isn't handled
+     */
+    private String serializeArray(Object object) {
+        if (object instanceof Object[]) {
+            Object[] array = (Object[]) object;
+            return "[" + Arrays.stream(array)
+                    .map(this::serialize)
+                    .collect(Collectors.joining(", ")) + "]";
+        } else if (object instanceof int[]) {
+            int[] array = (int[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof double[]) {
+            double[] array = (double[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof long[]) {
+            long[] array = (long[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof char[]) {
+            char[] array = (char[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof float[]) {
+            float[] array = (float[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof boolean[]) {
+            boolean[] array = (boolean[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof byte[]) {
+            byte[] array = (byte[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else if (object instanceof short[]) {
+            short[] array = (short[]) object;
+            return Arrays.toString(array).replace(" ", "");
+        } else {
+            throw new IllegalArgumentException("Unknown array type: " + object.getClass().getName());
+        }
+    }
+
+    /**
      * Writes a field to a JSON string.
      *
      * @param name the name of the field
@@ -134,7 +179,7 @@ final class JsonEncoder {
         try {
             if (includeNonNull && value == null) return null;
 
-            sb.append("\"").append(name).append("\": ");
+            sb.append("\"").append(name).append("\":");
 
             if (value instanceof Map) {
                 sb.append("{");
@@ -142,7 +187,7 @@ final class JsonEncoder {
                 String map = ((Map<?, ?>) value)
                         .entrySet()
                         .stream()
-                        .map(entry -> "\"" + entry.getKey() + "\": " + serialize(entry.getValue()))
+                        .map(entry -> "\"" + entry.getKey() + "\":" + serialize(entry.getValue()))
                         .collect(Collectors.joining(", "));
 
                 return sb.append(map)
@@ -156,7 +201,7 @@ final class JsonEncoder {
                 String collection = ((Collection<?>) value)
                         .stream()
                         .map(this::serialize)
-                        .collect(Collectors.joining(", "));
+                        .collect(Collectors.joining(","));
 
                 return sb.append(collection)
                         .append("]")
@@ -340,7 +385,7 @@ final class JsonEncoder {
          * @return the JSON string
          */
         private String serialize(Object object, JsonEncoder encoder) {
-            List<String> properties = new ArrayList<>();
+            List<String> properties = new LinkedList<>();
 
             for (Entry<String, Function<Object, Object>> entry : entrySet()) {
 
@@ -352,7 +397,7 @@ final class JsonEncoder {
                 properties.add(field);
             }
 
-            return "{" + String.join(", ", properties) + "}";
+            return "{" + String.join(",", properties) + "}";
         }
     }
 

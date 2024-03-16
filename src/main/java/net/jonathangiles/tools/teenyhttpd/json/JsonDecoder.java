@@ -1,7 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd.json;
 
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -98,7 +98,7 @@ final class JsonDecoder {
     }
 
     private List<Object> readArray() {
-        List<Object> result = new ArrayList<>();
+        List<Object> result = new LinkedList<>();
 
         boolean hasNext = true;
         while (hasNext) {
@@ -157,6 +157,11 @@ final class JsonDecoder {
                 return result;
             }
 
+            //readString requires the buffer to be at the start of the string
+            if (buffer.last() == '"') {
+                buffer.back();
+            }
+
             String key = readString();
 
             while (buffer.next()) {
@@ -192,6 +197,10 @@ final class JsonDecoder {
 
         char current() {
             return json.charAt(index);
+        }
+
+        char last() {
+            return json.charAt(index - 1);
         }
 
         void back() {

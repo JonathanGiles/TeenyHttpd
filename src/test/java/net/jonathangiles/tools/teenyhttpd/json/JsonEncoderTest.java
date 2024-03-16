@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,7 +20,6 @@ public class JsonEncoderTest {
 
     @Test
     void testSerialization() {
-
         Person person = new Person()
                 .setName("Alex")
                 .setAge(25)
@@ -111,6 +111,86 @@ public class JsonEncoderTest {
         ));
 
         System.out.println(json);
+    }
+
+    @Test
+    void testEncodeInteger() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", 1));
+
+        Assertions.assertEquals("{\"value\":1}", json);
+    }
+
+    @Test
+    void testEncodeString() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", "hello"));
+
+        Assertions.assertEquals("{\"value\":\"hello\"}", json);
+    }
+
+    @Test
+    void testEncodeBoolean() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", true));
+
+        Assertions.assertEquals("{\"value\":true}", json);
+
+        json = new TeenyJson()
+                .writeValueAsString(Map.of("value", false));
+
+        Assertions.assertEquals("{\"value\":false}", json);
+    }
+
+    @Test
+    void testEncodeNull() {
+        Map<String, Object> map = new HashMap<>();
+
+        map.put("value", null);
+
+        String json = new TeenyJson()
+                .writeValueAsString(map);
+
+        Assertions.assertEquals("{\"value\":null}", json);
+    }
+
+    @Test
+    void testEncodeArray() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", new int[]{1, 2, 3}));
+
+        Assertions.assertEquals("{\"value\":[1,2,3]}", json);
+    }
+
+    @Test
+    void testEncodeList() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", List.of(1, 2, 3)));
+
+        Assertions.assertEquals("{\"value\":[1,2,3]}", json);
+    }
+
+    @Test
+    void testEncodeMap() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", Map.of("key1", 1, "key2", 2)));
+
+        String case1 = "{\"value\":{\"key2\":2,\"key1\":1}}";
+        String case2 = "{\"value\":{\"key1\":1,\"key2\":2}}";
+
+        if (json.equals(case1) || json.equals(case2)) {
+            return;
+        }
+
+        Assertions.fail("Expected " + case1 + " or " + case2 + " but got " + json);
+    }
+
+    @Test
+    void testEncodeObject() {
+        String json = new TeenyJson()
+                .writeValueAsString(Map.of("value", new Person().setName("Alex").setAge(25)));
+
+        Assertions.assertEquals("{\"value\":{\"name\":\"Alex\",\"IceCreamLover\":false,\"age\":25}}", json);
     }
 
 
