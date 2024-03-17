@@ -193,5 +193,55 @@ public class JsonEncoderTest {
         Assertions.assertEquals("{\"value\":{\"name\":\"Alex\",\"IceCreamLover\":false,\"age\":25}}", json);
     }
 
+    @Test
+    void testJsonRaw() {
+        JsonRawObject target = new JsonRawObject()
+                .setName("Alex")
+                .setAge(30)
+                .setSalary(75)
+                .setDeveloper(true)
+                .setProgrammingLanguages(new TeenyJson()
+                        .writeValueAsString(List.of("Java", "Kotlin", "JavaScript")));
+
+        String json = new TeenyJson().writeValueAsString(target);
+
+        System.out.println(json);
+
+        Map<?, ?> map = new TeenyJson()
+                .readValue(json, Map.class);
+
+        System.out.println(map);
+
+        Assertions.assertEquals("Alex", map.get("name"));
+        Assertions.assertEquals("30", map.get("age"));
+        Assertions.assertEquals("75.0", map.get("salary"));
+        Assertions.assertEquals(Boolean.TRUE, map.get("developer"));
+
+        List<String> list = (List<String>) map.get("programmingLanguages");
+
+        Assertions.assertEquals("Java", list.get(0));
+        Assertions.assertEquals("Kotlin", list.get(1));
+        Assertions.assertEquals("JavaScript", list.get(2));
+
+    }
+
+    @Test
+    void testJsonIncludeNonNull() {
+        JsonRawObject target = new JsonRawObject()
+                .setName("Alex")
+                .setAge(30)
+                .setSalary(75)
+                .setDeveloper(true);
+
+        String json = new TeenyJson().writeValueAsString(target);
+
+        System.out.println(json);
+
+        Map<?, ?> map = new TeenyJson()
+                .readValue(json, Map.class);
+
+        Assertions.assertNotNull(map.get("name"));
+        Assertions.assertNull(map.get("programmingLanguages"));
+    }
 
 }

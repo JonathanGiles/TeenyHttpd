@@ -110,6 +110,10 @@ public final class TeenyJson {
         if (result == null) {
             return null;
         }
+        //return the parsed map
+        if (type == Map.class && result instanceof Map) {
+            return (T) result;
+        }
 
         return parseObject(result, type);
     }

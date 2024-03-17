@@ -22,7 +22,7 @@ final class JsonEncoder {
 
     private final Map<Class<?>, Mapper> cache = new ConcurrentHashMap<>();
     private final Map<Class<?>, ValueSerializer<?>> serializers = new ConcurrentHashMap<>();
-    private SimpleDateFormat dateFormatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
+    private final SimpleDateFormat dateFormatter = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss");
 
     SimpleDateFormat getDateFormatter() {
         return dateFormatter;
@@ -173,12 +173,21 @@ final class JsonEncoder {
      * @param includeNonNull whether to include null values or not
      * @return the JSON representation of the field
      */
-    private String writeField(String name, Object value, boolean includeNonNull) {
+    private String writeField(String name, Object value, boolean includeNonNull, AccessorInvoker invoker) {
+        if (includeNonNull && value == null) return null;
+
+        if (invoker.isAnnotationPresent(JsonRaw.class) && value instanceof String) {
+            if (invoker.getAnnotation(JsonRaw.class).includeKey()) {
+                return "\""+name + "\":" + value;
+            }
+            return (String) value;
+        }
+
+        if (invoker.isAnnotationPresent(JsonIncludeNonNull.class) && value == null) return null;
+
         StringBuilder sb = new StringBuilder();
 
         try {
-            if (includeNonNull && value == null) return null;
-
             sb.append("\"").append(name).append("\":");
 
             if (value instanceof Map) {
@@ -360,7 +369,7 @@ final class JsonEncoder {
      * It also holds the target class and a flag to include or not null values.
      * It is used to serialize an object to a JSON string.
      */
-    private static class Mapper extends HashMap<String, Function<Object, Object>> {
+    private static class Mapper extends HashMap<String, AccessorInvoker> {
         private final Class<?> target;
         private final boolean includeNonNull;
 
@@ -375,7 +384,7 @@ final class JsonEncoder {
             if (method.getParameterCount() > 0) return;
 
             String fieldName = getFieldName(method);
-            put(fieldName, createFunction(target, method.getName(), method.getReturnType()));
+            put(fieldName, createFunction(target, method));
         }
 
         /**
@@ -387,11 +396,10 @@ final class JsonEncoder {
         private String serialize(Object object, JsonEncoder encoder) {
             List<String> properties = new LinkedList<>();
 
-            for (Entry<String, Function<Object, Object>> entry : entrySet()) {
-
-                Object value = entry.getValue().apply(object);
+            for (Entry<String, AccessorInvoker> entry : entrySet()) {
+                Object value = entry.getValue().invoke(object);
                 if (value == null && !includeNonNull) continue;
-                String field = encoder.writeField(entry.getKey(), value, includeNonNull);
+                String field = encoder.writeField(entry.getKey(), value, includeNonNull, entry.getValue());
                 if (field == null) continue;
 
                 properties.add(field);
@@ -405,26 +413,25 @@ final class JsonEncoder {
      * Creates a function to call the getter method of a class.
      *
      * @param targetClass the class to create the function for
-     * @param targetMethod the method to call
-     * @param targetMethodReturnType the return type of the method
+     * @param method the method to call
      * @return the function to call the method
      * @throws Throwable if an error occurs while creating the function
      */
-    private static Function<Object, Object> createFunction(Class<?> targetClass, String targetMethod, Class<?> targetMethodReturnType) throws Throwable {
+    private static AccessorInvoker createFunction(Class<?> targetClass, Method method) throws Throwable {
         try {
             MethodHandles.Lookup lookup = getLookup(targetClass);
-            MethodHandle virtualMethodHandle = lookup.findVirtual(targetClass, targetMethod, MethodType.methodType(targetMethodReturnType));
+            MethodHandle virtualMethodHandle = lookup.findVirtual(targetClass, method.getName(), MethodType.methodType(method.getReturnType()));
             CallSite site = LambdaMetafactory.metafactory(lookup,
                     "apply",
                     MethodType.methodType(Function.class),
                     MethodType.methodType(Object.class, Object.class),
                     virtualMethodHandle,
-                    MethodType.methodType(targetMethodReturnType, targetClass));
+                    MethodType.methodType(method.getReturnType(), targetClass));
             @SuppressWarnings("unchecked")
             Function<Object, Object> getterFunction = (Function<Object, Object>) site.getTarget().invokeExact();
-            return getterFunction;
+            return new AccessorInvoker(method, getterFunction);
         } catch (IllegalAccessException e) {
-            throw new IllegalArgumentException("Unable to create function for " + targetClass + " at " + targetMethod, e);
+            throw new IllegalArgumentException("Unable to create function for " + targetClass + " at " + method.getName(), e);
         }
     }
 
