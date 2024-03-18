@@ -56,6 +56,11 @@ public class TeenyApplicationTest {
 
     }
 
+    public static void main(String[] args) {
+        TeenyApplication.start()
+                .register(new StoreController());
+    }
+
     @AfterEach
     public void tearDown() {
         TeenyApplication.stop();

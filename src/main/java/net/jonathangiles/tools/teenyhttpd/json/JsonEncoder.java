@@ -178,7 +178,7 @@ final class JsonEncoder {
 
         if (invoker.isAnnotationPresent(JsonRaw.class) && value instanceof String) {
             if (invoker.getAnnotation(JsonRaw.class).includeKey()) {
-                return "\""+name + "\":" + value;
+                return "\"" + name + "\":" + value;
             }
             return (String) value;
         }
@@ -369,7 +369,7 @@ final class JsonEncoder {
      * It also holds the target class and a flag to include or not null values.
      * It is used to serialize an object to a JSON string.
      */
-    private static class Mapper extends HashMap<String, AccessorInvoker> {
+    private static class Mapper extends ConcurrentHashMap<String, AccessorInvoker> {
         private final Class<?> target;
         private final boolean includeNonNull;
 
@@ -396,7 +396,7 @@ final class JsonEncoder {
         private String serialize(Object object, JsonEncoder encoder) {
             List<String> properties = new LinkedList<>();
 
-            for (Entry<String, AccessorInvoker> entry : entrySet()) {
+            for (Map.Entry<String, AccessorInvoker> entry : entrySet()) {
                 Object value = entry.getValue().invoke(object);
                 if (value == null && !includeNonNull) continue;
                 String field = encoder.writeField(entry.getKey(), value, includeNonNull, entry.getValue());
