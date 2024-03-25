@@ -12,6 +12,10 @@ public class ExampleApplication1 {
 
     @Inject
     private TodosService service;
+    @Value("server.port")
+    private int serverPort;
+    @Value("server.host:localhost")
+    private String serverHost;
 
     @Get("/todos")
     public TypedResponse<List<TodoDto>> getTodos() {
@@ -37,4 +41,11 @@ public class ExampleApplication1 {
         return TypedResponse.ok(service.add(todo));
     }
 
+    public int getServerPort() {
+        return serverPort;
+    }
+
+    public String getServerHost() {
+        return serverHost;
+    }
 }

@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class TeenyApplicationTest {
 
-    private static final int TEST_PORT = 8080;
-
 
     private static class ProtocolBufferMessageConverter implements MessageConverter {
 
@@ -86,14 +84,19 @@ public class TeenyApplicationTest {
         public Response(HttpResponse response) {
             this.statusCode = response.getStatusLine().getStatusCode();
 
+            for (org.apache.http.Header header : response.getAllHeaders()) {
+                headers.put(header.getName(), header.getValue());
+            }
+
+            if (statusCode == 204) {
+                this.body = "";
+                return;
+            }
+
             try {
                 this.body = EntityUtils.toString(response.getEntity());
             } catch (Exception e) {
                 throw new RuntimeException(e);
-            }
-
-            for (org.apache.http.Header header : response.getAllHeaders()) {
-                headers.put(header.getName(), header.getValue());
             }
         }
     }
@@ -109,7 +112,7 @@ public class TeenyApplicationTest {
     private Response executeRequest(Method method, String url, Map<String, String> headers, String requestBody) {
         CloseableHttpClient httpClient = HttpClients.createDefault();
 
-        String basePath = "http://localhost:" + TEST_PORT;
+        String basePath = "http://localhost:" + TeenyApplication.getProperty("server.port");
 
         url = basePath + url;
 
@@ -299,6 +302,7 @@ public class TeenyApplicationTest {
 
     @Test
     void testContentType() {
+        Assertions.assertNotNull(TeenyApplication.getMessageConverter("application/x-protobuf"));
         Response response = executeRequest(Method.GET, "/store/contentType");
         assertEquals(200, response.getStatusCode());
         assertEquals("application/x-protobuf", response.getFirstHeader("Content-Type"));

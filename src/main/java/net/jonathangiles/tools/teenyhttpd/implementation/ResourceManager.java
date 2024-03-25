@@ -14,14 +14,15 @@ public class ResourceManager {
 
     private final Map<Class<?>, Map<String, Object>> resources;
     private Set<Class<?>> classes;
+    private final BootstrapConfiguration configuration;
 
-    public ResourceManager(Set<Class<?>> classes) {
+    public ResourceManager(Set<Class<?>> classes, BootstrapConfiguration configuration) {
+        this.configuration = configuration;
         this.resources = new HashMap<>();
         this.classes = classes;
     }
 
-    public ResourceManager initialize() {
-
+    public void initialize() {
         List<Class<?>> configurations = classes.stream()
                 .filter(clazz -> clazz.isAnnotationPresent(Configuration.class))
                 .collect(Collectors.toList());
@@ -48,13 +49,11 @@ public class ResourceManager {
         for (Class<?> aClass : classes) {
             initialize(aClass);
         }
-
-        return this;
     }
 
     @SuppressWarnings("unchecked")
     public <T> List<T> findInstancesOf(Class<T> clazz) {
-        List<T> result = new ArrayList<>();
+        List<T> result = new LinkedList<>();
         for (Map<String, Object> map : resources.values()) {
             for (Object object : map.values()) {
                 if (clazz.isAssignableFrom(object.getClass())) {
@@ -65,9 +64,16 @@ public class ResourceManager {
         return result;
     }
 
-    public List<Object> findControllers() {
+    public <T> T getFirstInstanceOf(Class<T> clazz) {
+        List<T> instances = findInstancesOf(clazz);
+        if (instances.isEmpty()) {
+            return null;
+        }
+        return instances.get(0);
+    }
 
-        List<Object> result = new ArrayList<>();
+    public List<Object> findControllers() {
+        List<Object> result = new LinkedList<>();
 
         for (Map<String, Object> map : resources.values()) {
             for (Object object : map.values()) {
@@ -97,7 +103,7 @@ public class ResourceManager {
     }
 
     public List<Object> findAnnotatedWith(Class<? extends Annotation> annotation) {
-        List<Object> result = new ArrayList<>();
+        List<Object> result = new LinkedList<>();
         for (Map<String, Object> map : resources.values()) {
             for (Object object : map.values()) {
                 if (object.getClass().isAnnotationPresent(annotation)) {
@@ -109,7 +115,7 @@ public class ResourceManager {
     }
 
     public List<Object> allResources() {
-        List<Object> result = new ArrayList<>();
+        List<Object> result = new LinkedList<>();
         for (Map<String, Object> map : resources.values()) {
             result.addAll(map.values());
         }
@@ -144,7 +150,6 @@ public class ResourceManager {
 
     @SuppressWarnings("unchecked")
     private <T> T initialize(Class<T> clazz) {
-
         System.out.println("Starting: " + clazz);
 
         Constructor<?> constructor = getConstructor(clazz);
@@ -184,6 +189,17 @@ public class ResourceManager {
         Field[] fields = clazz.getDeclaredFields();
 
         for (Field field : fields) {
+            if (field.isAnnotationPresent(Value.class)) {
+                Value value = field.getAnnotation(Value.class);
+                Object property = configuration.getProperty(value.value(), value.required(), field.getType());
+                try {
+                    field.setAccessible(true);
+                    field.set(instance, property);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException("Failed to inject property " + value.value() + " into field " + field.getName() + " on class " + clazz.getName(), e);
+                }
+            }
+
             if (field.isAnnotationPresent(Inject.class)) {
                 Class<?> fieldType = field.getType();
                 String name = fieldType.getName();
@@ -236,7 +252,6 @@ public class ResourceManager {
     }
 
     private void register(Class<?> clazz, Object instance) {
-
         resources.put(clazz, new HashMap<>());
         resources.get(clazz).put(clazz.getName(), instance);
 

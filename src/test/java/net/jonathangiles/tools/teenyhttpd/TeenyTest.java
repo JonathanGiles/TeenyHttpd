@@ -27,7 +27,7 @@ public class TeenyTest {
     TeenyApplicationTest.Response executeRequest(Method method, String url, Map<String, String> headers, String requestBody) {
         CloseableHttpClient httpClient = HttpClients.createDefault();
 
-        String basePath = "http://localhost:" + TEST_PORT;
+        String basePath = "http://localhost:" + TeenyApplication.getProperty("server.port");
 
         url = basePath + url;
 

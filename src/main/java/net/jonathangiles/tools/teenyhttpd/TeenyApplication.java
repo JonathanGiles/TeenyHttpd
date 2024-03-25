@@ -1,7 +1,10 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
+import net.jonathangiles.tools.teenyhttpd.implementation.AnnotationScanner;
+import net.jonathangiles.tools.teenyhttpd.implementation.BootstrapConfiguration;
 import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter;
+import net.jonathangiles.tools.teenyhttpd.implementation.ResourceManager;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
 
@@ -11,6 +14,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,7 +26,7 @@ public class TeenyApplication {
 
     public static TeenyApplication start() {
         if (instance == null) {
-            instance = new TeenyApplication();
+            instance = new TeenyApplication(new BootstrapConfiguration());
         }
 
         instance._start();
@@ -32,10 +36,20 @@ public class TeenyApplication {
 
     public static TeenyApplication start(Class<?> clazz) {
         start();
-
-        instance.register(clazz);
-
+        instance.scan(clazz);
         return instance;
+    }
+
+    public static <T> T getResource(Class<T> clazz) {
+        return instance.resourceManager.getFirstInstanceOf(clazz);
+    }
+
+    public static MessageConverter getMessageConverter(String contentType) {
+        return instance.messageConverterMap.get(contentType);
+    }
+
+    public static String getProperty(String key) {
+        return instance.configuration.getProperty(key, true, String.class);
     }
 
     public static void stop() {
@@ -48,10 +62,14 @@ public class TeenyApplication {
     private final AtomicBoolean started = new AtomicBoolean(false);
     private final Map<String, MessageConverter> messageConverterMap;
     private final Map<String, ServerSentEventHandler> eventMap = new HashMap<>();
+    private ResourceManager resourceManager;
+    private final BootstrapConfiguration configuration;
 
-    private TeenyApplication() {
-        server = new TeenyHttpd(Integer.parseInt(System.getProperty("server.port", "8080")));
-        this.messageConverterMap = new HashMap<>();
+    private TeenyApplication(BootstrapConfiguration configuration) {
+        this.configuration = configuration;
+        configuration.readConfigurations();
+        server = new TeenyHttpd(configuration.getServerPort());
+        this.messageConverterMap = new ConcurrentHashMap<>();
         this.messageConverterMap.put(DefaultMessageConverter.INSTANCE.getContentType(), DefaultMessageConverter.INSTANCE);
         this.messageConverterMap.put("application/json", new net.jonathangiles.tools.teenyhttpd.json.TeenyJsonMessageConverter());
     }
@@ -61,6 +79,25 @@ public class TeenyApplication {
         return this;
     }
 
+    private void scan(Class<?> clazz) {
+        Set<Class<?>> classList = AnnotationScanner.scan(clazz);
+
+        resourceManager = new ResourceManager(classList, configuration);
+        resourceManager.initialize();
+
+        resourceManager.findInstancesOf(MessageConverter.class)
+                .forEach(this::registerMessageConverter);
+
+        resourceManager.findControllers()
+                .forEach(this::register);
+
+    }
+
+    /**
+     * Register a controller class with the application
+     * @param controller The controller class to register
+     * @return The application instance
+     */
     public TeenyApplication register(Class<?> controller) {
 
         Objects.requireNonNull(controller, "Controller cannot be null");
