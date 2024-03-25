@@ -4,9 +4,9 @@ import java.util.Objects;
 
 public class Pet {
 
-    private String name;
-    private int age;
-    private String type;
+    public String name;
+    public int age;
+    public String type;
 
     public Pet(String name, int age, String type) {
         this.name = name;

@@ -1,17 +1,15 @@
 package net.jonathangiles.tools.teenyhttpd;
 
-import com.google.gson.Gson;
-import net.jonathangiles.tools.teenyhttpd.annotations.Configuration;
+import net.jonathangiles.tools.teenyhttpd.json.TeenyJson;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Type;
 
-@Configuration
-public class GsonMessageConverter implements MessageConverter {
+public class TeenyJsonConverter implements MessageConverter {
 
-    final Gson gson = new Gson();
+    final TeenyJson teenyJson = new TeenyJson();
 
     @Override
     public String getContentType() {
@@ -27,16 +25,15 @@ public class GsonMessageConverter implements MessageConverter {
             return;
         }
 
-        dataOut.write(gson.toJson(value).getBytes());
+        dataOut.write(teenyJson.writeValueAsString(value).getBytes());
     }
 
     @Override
     public Object read(String value, Type type) {
-
-        if (String.class.isAssignableFrom((Class<?>) type)) {
-            return value;
+        try {
+            return teenyJson.readValue(value, type);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-
-        return gson.fromJson(value, type);
     }
 }

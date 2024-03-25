@@ -5,7 +5,6 @@ import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter
 import net.jonathangiles.tools.teenyhttpd.implementation.EmptyResponse;
 import net.jonathangiles.tools.teenyhttpd.implementation.StringResponse;
 import net.jonathangiles.tools.teenyhttpd.model.*;
-import net.jonathangiles.tools.teenyhttpd.model.TypedResponse;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -39,8 +38,8 @@ final class EndpointHandler implements Function<Request, Response> {
         this.target = target;
         this.parent = controller;
         this.parameters = target.getParameters();
-        this.converterMap = converterMap;
-        this.defaultConverter = converterMap.getOrDefault(getContentType(), DefaultMessageConverter.INSTANCE);
+        this.converterMap = new HashMap<>(converterMap);
+        this.defaultConverter = this.converterMap.getOrDefault(getContentType(), DefaultMessageConverter.INSTANCE);
         this.eventMap = eventMap;
 
         if (!target.trySetAccessible()) {
@@ -51,7 +50,6 @@ final class EndpointHandler implements Function<Request, Response> {
 
 
     private Object[] buildArguments(Request request) {
-
         if (parameters.length == 0) return null;
 
         Object[] args = new Object[parameters.length];
@@ -72,7 +70,6 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(QueryParam.class)) {
-
                 QueryParam queryParam = parameter.getAnnotation(QueryParam.class);
 
                 String param = request.getQueryParams().get(queryParam.value());
@@ -92,7 +89,6 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(RequestHeader.class)) {
-
                 Header header = request.getHeaders()
                         .get(parameter.getAnnotation(RequestHeader.class).value());
 
@@ -116,7 +112,6 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(RequestBody.class)) {
-
                 if (request.getBody() == null) {
                     continue;
                 }
@@ -148,7 +143,6 @@ final class EndpointHandler implements Function<Request, Response> {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parse(String source, Class<?> type) {
-
         if (type == String.class) {
 
             if (source == null) return null;
@@ -190,7 +184,6 @@ final class EndpointHandler implements Function<Request, Response> {
 
 
     private String getContentType() {
-
         if (contentType != null) return contentType;
 
         if (target.isAnnotationPresent(Get.class)) {
@@ -234,7 +227,6 @@ final class EndpointHandler implements Function<Request, Response> {
     }
 
     private MessageConverter getMessageConverter(Request request) {
-
         Optional<Header> opHeader = request.getHeader("Accept");
 
         if (opHeader.isPresent()) {
@@ -246,7 +238,6 @@ final class EndpointHandler implements Function<Request, Response> {
 
     @Override
     public Response apply(Request request) {
-
         try {
 
             MessageConverter converter = getMessageConverter(request);
@@ -304,7 +295,6 @@ final class EndpointHandler implements Function<Request, Response> {
     }
 
     private Response convert(TypedResponse<?> response, MessageConverter converter) {
-
         if (response.getBody() == null) {
             return new EmptyResponse(response.getStatusCode());
         }

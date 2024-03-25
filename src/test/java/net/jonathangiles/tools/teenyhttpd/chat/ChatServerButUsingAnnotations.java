@@ -25,11 +25,6 @@ public class ChatServerButUsingAnnotations {
 
     private final Gson gson = new Gson();
 
-    @Configuration
-    public GsonMessageConverter getGsonConverter() {
-        return new GsonMessageConverter();
-    }
-
     @ServerEvent(value = "/messages", name = "messages")
     public ServerSentEventHandler chatMessages() {
         return ServerSentEventHandler.create();

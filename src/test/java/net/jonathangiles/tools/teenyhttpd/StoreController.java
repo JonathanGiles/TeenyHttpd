@@ -106,7 +106,7 @@ public class StoreController {
 
     @Get(value = "/contentType", produces = "application/x-protobuf")
     public String contentType() {
-        return "test";
+        return "hi from protobuf";
     }
 
     @Get("/statusCode")
