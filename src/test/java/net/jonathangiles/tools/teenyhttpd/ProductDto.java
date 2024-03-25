@@ -1,10 +1,18 @@
 package net.jonathangiles.tools.teenyhttpd;
 
+
+import net.jonathangiles.tools.teenyhttpd.json.JsonIncludeNonNull;
+
+import java.util.Map;
+
+@JsonIncludeNonNull
 public class ProductDto {
 
-    private int id;
-    private String name;
-    private int price;
+    public int id;
+    public String name;
+    public int price;
+    public Map<String, Object> perks;
+
 
     public ProductDto() {
     }
@@ -13,6 +21,22 @@ public class ProductDto {
         this.id = id;
         this.name = name;
         this.price = price;
+    }
+
+
+    public Map<String, Object> getPerks() {
+        return perks;
+    }
+
+    public ProductDto put(String key, Object value) {
+
+        if (perks == null) {
+            perks = new java.util.HashMap<>();
+        }
+
+        perks.put(key, value);
+
+        return this;
     }
 
     public int getId() {
@@ -40,5 +64,15 @@ public class ProductDto {
     public ProductDto setPrice(int price) {
         this.price = price;
         return this;
+    }
+
+    @Override
+    public String toString() {
+        return "ProductDto{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", price=" + price +
+                ", perks=" + perks +
+                '}';
     }
 }

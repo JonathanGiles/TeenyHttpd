@@ -1,9 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
-import net.jonathangiles.tools.teenyhttpd.implementation.AnnotationScanner;
 import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter;
-import net.jonathangiles.tools.teenyhttpd.implementation.ResourceManager;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
 
@@ -35,7 +33,7 @@ public class TeenyApplication {
     public static TeenyApplication start(Class<?> clazz) {
         start();
 
-        instance.scan(clazz);
+        instance.register(clazz);
 
         return instance;
     }
@@ -47,37 +45,20 @@ public class TeenyApplication {
     }
 
     private final TeenyHttpd server;
-    private final AtomicBoolean started;
+    private final AtomicBoolean started = new AtomicBoolean(false);
     private final Map<String, MessageConverter> messageConverterMap;
-    private final Map<String, ServerSentEventHandler> eventMap;
-    private ResourceManager resourceManager;
+    private final Map<String, ServerSentEventHandler> eventMap = new HashMap<>();
 
     private TeenyApplication() {
         server = new TeenyHttpd(Integer.parseInt(System.getProperty("server.port", "8080")));
         this.messageConverterMap = new HashMap<>();
         this.messageConverterMap.put(DefaultMessageConverter.INSTANCE.getContentType(), DefaultMessageConverter.INSTANCE);
-
-        eventMap = new HashMap<>();
-        started = new AtomicBoolean(false);
+        this.messageConverterMap.put("application/json", new net.jonathangiles.tools.teenyhttpd.json.TeenyJsonMessageConverter());
     }
 
     public TeenyApplication registerMessageConverter(MessageConverter messageConverter) {
         messageConverterMap.put(messageConverter.getContentType(), messageConverter);
         return this;
-    }
-
-    private void scan(Class<?> clazz) {
-        Set<Class<?>> classList = AnnotationScanner.scan(clazz);
-
-        resourceManager = new ResourceManager(classList);
-        resourceManager.initialize();
-
-        resourceManager.findInstancesOf(MessageConverter.class)
-                .forEach(this::registerMessageConverter);
-
-        resourceManager.findControllers()
-                .forEach(this::register);
-
     }
 
     public TeenyApplication register(Class<?> controller) {
@@ -112,13 +93,17 @@ public class TeenyApplication {
 
     private void addController(Object controller) {
 
-        System.out.println("Adding controller: " + controller.getClass().getSimpleName());
-
         Objects.requireNonNull(controller, "Controller cannot be null");
 
         Method[] methods = controller.getClass().getDeclaredMethods();
 
+
         for (Method method : methods) {
+            if (method.isAnnotationPresent(Configuration.class)) {
+                handleConfiguration(controller, method);
+                continue;
+            }
+
             if (method.isAnnotationPresent(ServerEvent.class)
                     && ServerSentEventHandler.class.isAssignableFrom(method.getReturnType())) {
                 addServerEvent(controller, method);
@@ -127,7 +112,11 @@ public class TeenyApplication {
 
         for (Method method : methods) {
 
-            if (AnnotationScanner.isEndpoint(method)) {
+            if (method.isAnnotationPresent(Get.class) ||
+                    method.isAnnotationPresent(Post.class) ||
+                    method.isAnnotationPresent(Delete.class) ||
+                    method.isAnnotationPresent(Put.class) ||
+                    method.isAnnotationPresent(Patch.class)) {
 
                 addEndpoint(controller, method);
 
@@ -135,6 +124,24 @@ public class TeenyApplication {
         }
     }
 
+    private void handleConfiguration(Object controller, Method method) {
+
+        if (Void.class.isAssignableFrom(method.getReturnType())) {
+            return;
+        }
+
+        try {
+            method.setAccessible(true);
+            Object configuration = method.invoke(controller);
+
+            if (configuration instanceof MessageConverter) {
+                registerMessageConverter((MessageConverter) configuration);
+            }
+
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     private void addServerEvent(Object controller, Method method) {
 
@@ -159,8 +166,7 @@ public class TeenyApplication {
             eventMap.put(name, result);
             server.addServerSentEventRoute(route, result);
 
-            Logger.getLogger(TeenyApplication.class.getName())
-                    .log(Level.INFO, "Added server event: " + name + " at route " + route);
+            Logger.getLogger(TeenyApplication.class.getName()).log(Level.INFO, "Added server event: " + name + " at route " + route);
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
@@ -183,9 +189,6 @@ public class TeenyApplication {
 
         server.addRoute(getMethod(method), getRoute(controller, method),
                 new EndpointHandler(method, controller, messageConverterMap, eventMap));
-
-        Logger.getLogger(TeenyApplication.class.getName())
-                .log(Level.INFO, "Added route: " + getRoute(controller, method));
 
     }
 
