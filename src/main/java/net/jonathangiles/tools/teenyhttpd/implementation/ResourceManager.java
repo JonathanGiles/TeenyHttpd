@@ -1,5 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd.implementation;
 
+import net.jonathangiles.tools.teenyhttpd.annotations.EventListener;
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
 
 import java.lang.annotation.Annotation;
@@ -94,6 +95,49 @@ public class ResourceManager {
                             || method.isAnnotationPresent(ServerEvent.class)) {
                         result.add(object);
                         break;
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public List<EventListenerHandler<Void>> getOnApplicationReadyListeners() {
+        List<EventListenerHandler<Void>> result = new LinkedList<>();
+
+        for (Map<String, Object> map : resources.values()) {
+            for (Object object : map.values()) {
+                Method[] methods = object.getClass().getDeclaredMethods();
+
+                for (Method method : methods) {
+                    if (method.getParameterCount() > 0 || !method.isAnnotationPresent(OnApplicationReady.class))
+                        continue;
+                    result.add(new EventListenerHandler<>(method, object));
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public <T> List<EventListenerHandler<T>> getEventListeners(Class<T> clazz) {
+        List<EventListenerHandler<T>> result = new LinkedList<>();
+
+        for (Map<String, Object> map : resources.values()) {
+            for (Object object : map.values()) {
+                Method[] methods = object.getClass().getDeclaredMethods();
+
+                for (Method method : methods) {
+                    if (method.getParameterCount() > 1) continue;
+                    if (method.getParameterCount() == 0 && clazz == Void.class) {
+                        result.add(new EventListenerHandler<>(method, object));
+                        continue;
+                    }
+
+                    if (method.isAnnotationPresent(EventListener.class) &&
+                            method.getParameterTypes()[0] == clazz) {
+                        result.add(new EventListenerHandler<>(method, object));
                     }
                 }
             }

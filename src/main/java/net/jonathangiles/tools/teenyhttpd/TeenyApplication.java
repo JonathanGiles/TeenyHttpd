@@ -1,10 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
-import net.jonathangiles.tools.teenyhttpd.implementation.AnnotationScanner;
-import net.jonathangiles.tools.teenyhttpd.implementation.BootstrapConfiguration;
-import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter;
-import net.jonathangiles.tools.teenyhttpd.implementation.ResourceManager;
+import net.jonathangiles.tools.teenyhttpd.implementation.*;
 import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
 
@@ -12,14 +9,11 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static net.jonathangiles.tools.teenyhttpd.model.Method.*;
 
 public class TeenyApplication {
     private static TeenyApplication instance;
@@ -81,6 +75,7 @@ public class TeenyApplication {
 
     private void scan(Class<?> clazz) {
         Set<Class<?>> classList = AnnotationScanner.scan(clazz);
+        classList.addAll(AnnotationScanner.scan("net.jonathangiles.tools.teenyhttpd.configuration"));
 
         resourceManager = new ResourceManager(classList, configuration);
         resourceManager.initialize();
@@ -91,6 +86,8 @@ public class TeenyApplication {
         resourceManager.findControllers()
                 .forEach(this::register);
 
+        resourceManager.getOnApplicationReadyListeners()
+                .forEach(listener -> listener.invoke(null));
     }
 
     /**
@@ -99,7 +96,6 @@ public class TeenyApplication {
      * @return The application instance
      */
     public TeenyApplication register(Class<?> controller) {
-
         Objects.requireNonNull(controller, "Controller cannot be null");
 
         Optional<Constructor<?>> opConstructor = Arrays.stream(controller.getDeclaredConstructors())
@@ -129,11 +125,9 @@ public class TeenyApplication {
     }
 
     private void addController(Object controller) {
-
         Objects.requireNonNull(controller, "Controller cannot be null");
 
         Method[] methods = controller.getClass().getDeclaredMethods();
-
 
         for (Method method : methods) {
             if (method.isAnnotationPresent(Configuration.class)) {
@@ -147,6 +141,13 @@ public class TeenyApplication {
             }
         }
 
+        Path context = controller.getClass()
+                .getAnnotation(Path.class);
+
+        String contextPath = context == null ? "" : context.value();
+
+        List<EventListenerHandler<EndpointMapping>> eventListeners = resourceManager.getEventListeners(EndpointMapping.class);
+
         for (Method method : methods) {
 
             if (method.isAnnotationPresent(Get.class) ||
@@ -155,14 +156,14 @@ public class TeenyApplication {
                     method.isAnnotationPresent(Put.class) ||
                     method.isAnnotationPresent(Patch.class)) {
 
-                addEndpoint(controller, method);
+                EndpointMapping mapping = addEndpoint(contextPath, controller, method);
 
+                eventListeners.forEach(listener -> listener.invoke(mapping));
             }
         }
     }
 
     private void handleConfiguration(Object controller, Method method) {
-
         if (Void.class.isAssignableFrom(method.getReturnType())) {
             return;
         }
@@ -209,129 +210,26 @@ public class TeenyApplication {
         }
     }
 
-    private void addEndpoint(Object controller, Method method) {
+    private EndpointMapping addEndpoint(String basePath, Object controller, Method method) {
+        EndpointMapping mapping = new EndpointMapping(basePath, method);
 
         if (File.class.isAssignableFrom(method.getReturnType())) {
             try {
                 method.setAccessible(true);
-                server.addFileRoute(getRoute(controller, method), (File) method.invoke(controller));
+                server.addFileRoute(mapping.getPath(), (File) method.invoke(controller));
             } catch (IllegalAccessException | InvocationTargetException e) {
                 Logger.getLogger(TeenyApplication.class.getName()).log(Level.SEVERE, "Error adding file route", e);
             }
 
-            return;
+            return mapping;
         }
 
-        validateMethod(controller, method);
+        server.addRoute(mapping.getMethod(), mapping.getPath(),
+                new EndpointHandler(mapping, controller, messageConverterMap, eventMap));
 
-        server.addRoute(getMethod(method), getRoute(controller, method),
-                new EndpointHandler(method, controller, messageConverterMap, eventMap));
-
+        return mapping;
     }
 
-    private void validateMethod(Object controller, Method method) {
-
-        String route = getRoute(controller, method);
-
-        if (route.contains("?")) {
-            throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Query parameters must be annotated with @QueryParam");
-        }
-
-        int bodyCount = 0;
-
-        for (Parameter parameter : method.getParameters()) {
-
-            if (parameter.isAnnotationPresent(RequestBody.class)) {
-                bodyCount++;
-            }
-
-            if (parameter.isAnnotationPresent(QueryParam.class)) {
-                QueryParam queryParam = parameter.getAnnotation(QueryParam.class);
-
-                if (queryParam.value().isEmpty()) {
-                    throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " QueryParam value cannot be empty");
-                }
-            }
-
-            if (parameter.isAnnotationPresent(RequestHeader.class)) {
-                RequestHeader requestHeader = parameter.getAnnotation(RequestHeader.class);
-
-                if (requestHeader.value().isEmpty()) {
-                    throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " RequestHeader value cannot be empty");
-                }
-            }
-
-            if (parameter.isAnnotationPresent(PathParam.class)) {
-                PathParam pathParam = parameter.getAnnotation(PathParam.class);
-
-                if (pathParam.value().isEmpty()) {
-                    throw new IllegalStateException("Error at function " + method.getName() + " at parameter " + parameter.getName() + " PathParam value cannot be empty");
-                }
-            }
-        }
-
-        if (bodyCount > 1) {
-            throw new IllegalStateException("Error at function " + method.getName() + " at route " + route + " Only one parameter can be annotated with @RequestBody");
-        }
-    }
-
-    private String getRoute(Object controller, Method method) {
-
-        Path context = controller.getClass()
-                .getAnnotation(Path.class);
-
-        String path = "";
-
-        if (method.isAnnotationPresent(Get.class)) {
-            path = method.getAnnotation(Get.class).value();
-        } else if (method.isAnnotationPresent(Post.class)) {
-            path = method.getAnnotation(Post.class).value();
-        } else if (method.isAnnotationPresent(Delete.class)) {
-            path = method.getAnnotation(Delete.class).value();
-        } else if (method.isAnnotationPresent(Put.class)) {
-            path = method.getAnnotation(Put.class).value();
-        } else if (method.isAnnotationPresent(Patch.class)) {
-            path = method.getAnnotation(Patch.class).value();
-        }
-
-        path = path.trim();
-
-        if (context != null && context.value() != null) {
-
-            if (path.startsWith("/")) {
-                path = context.value() + path;
-            } else {
-                path = context.value() + "/" + path;
-            }
-        }
-
-        return path;
-    }
-
-    private net.jonathangiles.tools.teenyhttpd.model.Method getMethod(Method method) {
-
-        if (method.isAnnotationPresent(Get.class)) {
-            return GET;
-        }
-
-        if (method.isAnnotationPresent(Delete.class)) {
-            return DELETE;
-        }
-
-        if (method.isAnnotationPresent(Post.class)) {
-            return POST;
-        }
-
-        if (method.isAnnotationPresent(Put.class)) {
-            return PUT;
-        }
-
-        if (method.isAnnotationPresent(Patch.class)) {
-            return PATCH;
-        }
-
-        throw new IllegalArgumentException("Method not supported: " + method.getName());
-    }
 
     private synchronized void _stop() {
         server.stop();
@@ -339,7 +237,6 @@ public class TeenyApplication {
     }
 
     private synchronized void _start() {
-
         if (started.get()) {
             return;
         }

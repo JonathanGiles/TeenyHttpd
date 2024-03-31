@@ -6,6 +6,10 @@ import net.jonathangiles.tools.teenyhttpd.pack1.ExampleApplication1;
 import net.jonathangiles.tools.teenyhttpd.pack2.ExampleApplication2;
 import org.junit.jupiter.api.*;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+
 public class AutoConfigurationTest extends TeenyTest {
 
     @BeforeEach
@@ -53,6 +57,19 @@ public class AutoConfigurationTest extends TeenyTest {
         ExampleApplication1 exampleApplication2 = TeenyApplication.getResource(ExampleApplication1.class);
         Assertions.assertEquals(3000, exampleApplication2.getServerPort());
         Assertions.assertEquals("localhost", exampleApplication2.getServerHost());
+    }
+
+    @Order(7)
+    @Test
+    void testOpenApi() throws IOException {
+        TeenyApplicationTest.Response response = executeRequest(Method.GET, "/docs/openapi");
+        Assertions.assertEquals(200, response.getStatusCode());
+        System.out.println(response.getBody());
+
+        File file = new File("openapi.json");
+        FileWriter fileWriter = new FileWriter(file);
+        fileWriter.write(response.getBody());
+        fileWriter.close();
     }
 
     @Order(999)

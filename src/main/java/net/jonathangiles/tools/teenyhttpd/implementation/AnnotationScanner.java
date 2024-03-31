@@ -1,5 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd.implementation;
 
+import net.jonathangiles.tools.teenyhttpd.annotations.*;
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -7,8 +9,6 @@ import java.net.URL;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import net.jonathangiles.tools.teenyhttpd.annotations.*;
 
 public class AnnotationScanner {
 
@@ -22,23 +22,30 @@ public class AnnotationScanner {
         packages.add(packageName);
 
         for (String aPackage : packages) {
-            try {
-                List<Class<?>> classes = getClasses(aPackage);
-
-                for (Class<?> clazz : classes) {
-                    if (hasAnnotations(clazz)) {
-                        classList.add(clazz);
-                    }
-                }
-
-            } catch (ClassNotFoundException | IOException e) {
-                Logger.getLogger(AnnotationScanner.class.getName())
-                        .log(Level.SEVERE, null, e);
-            }
+            classList.addAll(scan(aPackage));
         }
 
         if (hasEndpoints(target)) {
             classList.add(target);
+        }
+
+        return classList;
+    }
+
+    public static Set<Class<?>> scan(String aPackage) {
+        Set<Class<?>> classList = new HashSet<>();
+        try {
+            List<Class<?>> classes = getClasses(aPackage);
+
+            for (Class<?> clazz : classes) {
+                if (hasAnnotations(clazz)) {
+                    classList.add(clazz);
+                }
+            }
+
+        } catch (ClassNotFoundException | IOException e) {
+            Logger.getLogger(AnnotationScanner.class.getName())
+                    .log(Level.SEVERE, null, e);
         }
 
         return classList;
