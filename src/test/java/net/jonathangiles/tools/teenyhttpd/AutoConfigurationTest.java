@@ -1,6 +1,7 @@
 package net.jonathangiles.tools.teenyhttpd;
 
 
+import net.jonathangiles.tools.teenyhttpd.annotations.EnableOpenApi;
 import net.jonathangiles.tools.teenyhttpd.model.Method;
 import net.jonathangiles.tools.teenyhttpd.pack1.ExampleApplication1;
 import net.jonathangiles.tools.teenyhttpd.pack2.ExampleApplication2;
@@ -10,6 +11,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
+@EnableOpenApi
 public class AutoConfigurationTest extends TeenyTest {
 
     @BeforeEach

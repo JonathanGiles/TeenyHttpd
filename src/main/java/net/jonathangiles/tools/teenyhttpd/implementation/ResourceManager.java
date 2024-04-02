@@ -1,5 +1,6 @@
 package net.jonathangiles.tools.teenyhttpd.implementation;
 
+import net.jonathangiles.tools.teenyhttpd.TeenyApplication;
 import net.jonathangiles.tools.teenyhttpd.annotations.EventListener;
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
 
@@ -9,32 +10,51 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+/**
+ * This class is responsible for managing the resources that are used by the TeenyHttpd server. It is responsible for
+ * initializing the resources, injecting properties and resources into the resources, and invoking any methods that
+ * are annotated with @PostConstruct.
+ */
 public class ResourceManager {
 
     private final Map<Class<?>, Map<String, Object>> resources;
     private Set<Class<?>> classes;
+    private final Set<OrderedClass> enabledClasses;
     private final BootstrapConfiguration configuration;
 
-    public ResourceManager(Set<Class<?>> classes, BootstrapConfiguration configuration) {
+    public ResourceManager(Set<Class<?>> classes, Set<OrderedClass> enabledClasses, BootstrapConfiguration configuration) {
         this.configuration = configuration;
         this.resources = new HashMap<>();
         this.classes = classes;
+        this.enabledClasses = enabledClasses;
     }
 
     public void initialize() {
-        List<Class<?>> configurations = classes.stream()
+        List<OrderedClass> configurations = classes.stream()
                 .filter(clazz -> clazz.isAnnotationPresent(Configuration.class))
+                .map(clazz -> new OrderedClass(clazz, clazz.getAnnotation(Configuration.class).order()))
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        //Enabled classes must not have a @Configuration annotation, but are treated as if they do
+        enabledClasses.stream()
+                .peek(orderedClass -> orderedClass.validateAnnotationIsNotPresent(Configuration.class))
+                .forEach(configurations::add);
+
+        configurations = configurations.stream()
+                .distinct()
+                .sorted(Comparator.comparingInt(OrderedClass::getOrder))
                 .collect(Collectors.toList());
+
+        for (OrderedClass orderedClass : configurations) {
+            initialize(orderedClass.getClazz());
+        }
 
         List<Class<?>> resources = classes.stream()
                 .filter(clazz -> clazz.isAnnotationPresent(Resource.class))
                 .collect(Collectors.toList());
-
-        for (Class<?> configuration : configurations) {
-            initialize(configuration);
-        }
 
         for (Class<?> resource : resources) {
             initialize(resource);
@@ -49,6 +69,45 @@ public class ResourceManager {
 
         for (Class<?> aClass : classes) {
             initialize(aClass);
+        }
+    }
+
+    public static class OrderedClass {
+        private final Class<?> clazz;
+        private final int order;
+
+        public OrderedClass(Class<?> clazz, int order) {
+            this.clazz = clazz;
+            this.order = order;
+        }
+
+        public void validateAnnotationIsNotPresent(Class<? extends Annotation> annotation) {
+            if (clazz.isAnnotationPresent(annotation)) {
+                throw new RuntimeException("Class " + clazz.getName() + " cannot have the annotation " + annotation.getName());
+            }
+        }
+
+        public Class<?> getClazz() {
+            return clazz;
+        }
+
+        public int getOrder() {
+            return order;
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) return true;
+            if (object == null || getClass() != object.getClass()) return false;
+
+            OrderedClass that = (OrderedClass) object;
+
+            return getClazz().equals(that.getClazz());
+        }
+
+        @Override
+        public int hashCode() {
+            return getClazz().hashCode();
         }
     }
 
@@ -87,12 +146,7 @@ public class ResourceManager {
                 Method[] methods = object.getClass().getDeclaredMethods();
 
                 for (Method method : methods) {
-                    if (method.isAnnotationPresent(Get.class)
-                            || method.isAnnotationPresent(Delete.class)
-                            || method.isAnnotationPresent(Put.class)
-                            || method.isAnnotationPresent(Post.class)
-                            || method.isAnnotationPresent(Patch.class)
-                            || method.isAnnotationPresent(ServerEvent.class)) {
+                    if (TeenyApplication.isEndpoint(method) || method.isAnnotationPresent(ServerEvent.class)) {
                         result.add(object);
                         break;
                     }
@@ -194,7 +248,7 @@ public class ResourceManager {
 
     @SuppressWarnings("unchecked")
     private <T> T initialize(Class<T> clazz) {
-        System.out.println("Starting: " + clazz);
+        Logger.getLogger(ResourceManager.class.getName()).info("Starting: " + clazz);
 
         Constructor<?> constructor = getConstructor(clazz);
 

@@ -26,7 +26,9 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Configuration
+/**
+ * This configuration class is used to generate an OpenApi specification for the TeenyHttpd server.
+ */
 public class OpenApiConfiguration {
 
     private String specification;

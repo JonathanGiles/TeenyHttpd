@@ -28,7 +28,6 @@ final class EndpointHandler implements Function<Request, Response> {
     private final MessageConverter defaultConverter;
     private final Map<String, ServerSentEventHandler> eventMap;
     private final Map<String, MessageConverter> converterMap;
-    private String contentType;
 
     EndpointHandler(final EndpointMapping mapping, final Object controller,
                     Map<String, MessageConverter> converterMap,

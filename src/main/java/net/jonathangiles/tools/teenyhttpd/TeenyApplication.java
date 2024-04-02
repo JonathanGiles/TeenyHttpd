@@ -6,6 +6,7 @@ import net.jonathangiles.tools.teenyhttpd.model.MessageConverter;
 import net.jonathangiles.tools.teenyhttpd.model.ServerSentEventHandler;
 
 import java.io.File;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -75,9 +76,52 @@ public class TeenyApplication {
 
     private void scan(Class<?> clazz) {
         Set<Class<?>> classList = AnnotationScanner.scan(clazz);
+
+        //Annotated classes with @Configuration will be automatically registered
         classList.addAll(AnnotationScanner.scan("net.jonathangiles.tools.teenyhttpd.configuration"));
 
-        resourceManager = new ResourceManager(classList, configuration);
+        if (clazz.isAnnotationPresent(ScanPackage.class)) {
+            ScanPackage scanPackage = clazz.getAnnotation(ScanPackage.class);
+            for (String packageName : scanPackage.value()) {
+                Logger.getLogger(TeenyApplication.class.getName())
+                        .log(Level.INFO, "Scanning package: " + packageName);
+
+                classList.addAll(AnnotationScanner.scan(packageName));
+            }
+        }
+
+        Set<ResourceManager.OrderedClass> enabledClasses = new HashSet<>();
+
+        for (Annotation annotation : clazz.getAnnotations()) {
+            if (annotation instanceof Enables) {
+                Enables enables = (Enables) annotation;
+
+                for (Enable enable : enables.value()) {
+                    enabledClasses.add(new ResourceManager.OrderedClass(enable.value(), enable.order()));
+                }
+            }
+
+            if (annotation instanceof Enable) {
+                Enable enable = (Enable) annotation;
+                enabledClasses.add(new ResourceManager.OrderedClass(enable.value(), enable.order()));
+            }
+
+            //Register sugar annotations like @EnableOpenApi
+            if (annotation.annotationType().isAnnotationPresent(Enables.class)) {
+                Enables enables = annotation.annotationType().getAnnotation(Enables.class);
+
+                for (Enable enable : enables.value()) {
+                    enabledClasses.add(new ResourceManager.OrderedClass(enable.value(), enable.order()));
+                }
+            }
+
+            if (annotation.annotationType().isAnnotationPresent(Enable.class)) {
+                Enable enable = annotation.annotationType().getAnnotation(Enable.class);
+                enabledClasses.add(new ResourceManager.OrderedClass(enable.value(), enable.order()));
+            }
+        }
+
+        resourceManager = new ResourceManager(classList, enabledClasses, configuration);
         resourceManager.initialize();
 
         resourceManager.findInstancesOf(MessageConverter.class)
@@ -125,6 +169,9 @@ public class TeenyApplication {
     }
 
     private void addController(Object controller) {
+        Logger.getLogger(TeenyApplication.class.getName())
+                .log(Level.INFO, "Registering controller: " + controller.getClass().getName());
+
         Objects.requireNonNull(controller, "Controller cannot be null");
 
         Method[] methods = controller.getClass().getDeclaredMethods();
@@ -149,18 +196,20 @@ public class TeenyApplication {
         List<EventListenerHandler<EndpointMapping>> eventListeners = resourceManager.getEventListeners(EndpointMapping.class);
 
         for (Method method : methods) {
-
-            if (method.isAnnotationPresent(Get.class) ||
-                    method.isAnnotationPresent(Post.class) ||
-                    method.isAnnotationPresent(Delete.class) ||
-                    method.isAnnotationPresent(Put.class) ||
-                    method.isAnnotationPresent(Patch.class)) {
-
+            if (isEndpoint(method)) {
                 EndpointMapping mapping = addEndpoint(contextPath, controller, method);
 
                 eventListeners.forEach(listener -> listener.invoke(mapping));
             }
         }
+    }
+
+    public static boolean isEndpoint(Method method) {
+        return method.isAnnotationPresent(Get.class) ||
+                method.isAnnotationPresent(Post.class) ||
+                method.isAnnotationPresent(Delete.class) ||
+                method.isAnnotationPresent(Put.class) ||
+                method.isAnnotationPresent(Patch.class);
     }
 
     private void handleConfiguration(Object controller, Method method) {
