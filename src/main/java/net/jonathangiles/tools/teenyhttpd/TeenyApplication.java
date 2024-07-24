@@ -53,6 +53,7 @@ public class TeenyApplication {
         server = new TeenyHttpd(Integer.parseInt(System.getProperty("server.port", "8080")));
         this.messageConverterMap = new HashMap<>();
         this.messageConverterMap.put(DefaultMessageConverter.INSTANCE.getContentType(), DefaultMessageConverter.INSTANCE);
+        this.messageConverterMap.put("application/json", new net.jonathangiles.tools.teenyhttpd.json.TeenyJsonMessageConverter());
     }
 
     public TeenyApplication registerMessageConverter(MessageConverter messageConverter) {

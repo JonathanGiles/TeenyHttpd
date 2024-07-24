@@ -295,7 +295,7 @@ public ServerSentEventHandler chatMessages() {
 Use it directly anywhere:
 
 ```java
-Post("/message")
+@Post("/message")
 public void message(@QueryParam("message") String message,
                     @EventHandler("messages") ServerSentEventHandler chatMessagesEventHandler) {
     chatMessagesEventHandler.sendMessage(message);
@@ -346,6 +346,73 @@ Similar to Spring, `@Configuration` is used to provide configurations. To specif
 public GsonMessageConverter getGsonConverter() {
 	return new GsonMessageConverter();
 }
+```
+
+## TeenyJson
+
+TeenyHttpd includes a simple JSON library called TeenyJson. It is a simple, lightweight JSON library that is used to convert JSON strings to Java objects, and vice versa.
+It is not as feature-rich as other JSON libraries, but it is lightweight and easy to use.
+
+### Parsing JSON
+
+```java
+Person person = new TeenyJson().readValue(json, Person.class);
+```
+
+Similar to jackson to parse a ambiguous property, you can use the `@JsonDeserialize` annotation:
+
+```java
+@JsonDeserialize(contentAs = ObjectC.class)
+public void setList(List<? extends ObjectC> list) {
+    this.list = list;
+}
+
+@JsonDeserialize(as = ObjectC.class)
+public void setC(ObjectC c) {
+    this.c = c;
+}
+```
+
+### Generating JSON
+
+```java
+Person person = new Person("John", 30, null);
+String json = new TeenyJson().writeValueAsString(person);
+```
+
+To give a property an alias in the JSON, you can use the `@JsonProperty` annotation:
+
+```java
+@JsonAlias("bestSongs")
+public Set<String> getFavoriteSongs() {
+    return favoriteSongs;
+}
+```
+
+To ignore a property in the JSON, you can use the `@JsonIgnore` annotation:
+
+```java
+@JsonIgnore
+public String getSecret() {
+    return secret;
+}
+```
+
+To ignore all properties that are null, you can use the `@JsonIncludeNonNull` annotation:
+
+```java
+@JsonIncludeNonNull
+public class Person {
+// ...
+}
+```
+
+You can also customize the deserialization and serialization process by specifying a custom serializer or deserializer:
+
+```java
+new TeenyJson()
+    .registerSerializer(String.class, String::toUpperCase)
+    .registerParser(String.class, (value) -> value.toString().toLowerCase());
 ```
 
 ## Project Management
