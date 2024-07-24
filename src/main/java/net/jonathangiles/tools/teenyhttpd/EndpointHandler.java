@@ -3,14 +3,12 @@ package net.jonathangiles.tools.teenyhttpd;
 import net.jonathangiles.tools.teenyhttpd.annotations.*;
 import net.jonathangiles.tools.teenyhttpd.implementation.DefaultMessageConverter;
 import net.jonathangiles.tools.teenyhttpd.implementation.EmptyResponse;
+import net.jonathangiles.tools.teenyhttpd.implementation.EndpointMapping;
 import net.jonathangiles.tools.teenyhttpd.implementation.StringResponse;
 import net.jonathangiles.tools.teenyhttpd.model.*;
-import net.jonathangiles.tools.teenyhttpd.model.TypedResponse;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -24,26 +22,25 @@ import java.util.logging.Logger;
  */
 final class EndpointHandler implements Function<Request, Response> {
 
-    private final Method target;
+    private final EndpointMapping mapping;
     private final Object parent;
     private final Parameter[] parameters;
     private final MessageConverter defaultConverter;
     private final Map<String, ServerSentEventHandler> eventMap;
     private final Map<String, MessageConverter> converterMap;
-    private String contentType;
 
-    EndpointHandler(final Method target, final Object controller,
+    EndpointHandler(final EndpointMapping mapping, final Object controller,
                     Map<String, MessageConverter> converterMap,
                     Map<String, ServerSentEventHandler> eventMap) {
 
-        this.target = target;
+        this.mapping = mapping;
         this.parent = controller;
-        this.parameters = target.getParameters();
-        this.converterMap = converterMap;
-        this.defaultConverter = converterMap.getOrDefault(getContentType(), DefaultMessageConverter.INSTANCE);
+        this.parameters = mapping.getParameters();
+        this.converterMap = new HashMap<>(converterMap);
+        this.defaultConverter = this.converterMap.getOrDefault(mapping.getContentType(), DefaultMessageConverter.INSTANCE);
         this.eventMap = eventMap;
 
-        if (!target.trySetAccessible()) {
+        if (!mapping.getTarget().trySetAccessible()) {
             Logger.getLogger(EndpointHandler.class.getName())
                     .info("Could not set method accessible");
         }
@@ -51,7 +48,6 @@ final class EndpointHandler implements Function<Request, Response> {
 
 
     private Object[] buildArguments(Request request) {
-
         if (parameters.length == 0) return null;
 
         Object[] args = new Object[parameters.length];
@@ -72,7 +68,6 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(QueryParam.class)) {
-
                 QueryParam queryParam = parameter.getAnnotation(QueryParam.class);
 
                 String param = request.getQueryParams().get(queryParam.value());
@@ -92,7 +87,6 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(RequestHeader.class)) {
-
                 Header header = request.getHeaders()
                         .get(parameter.getAnnotation(RequestHeader.class).value());
 
@@ -116,7 +110,6 @@ final class EndpointHandler implements Function<Request, Response> {
             }
 
             if (parameter.isAnnotationPresent(RequestBody.class)) {
-
                 if (request.getBody() == null) {
                     continue;
                 }
@@ -148,7 +141,6 @@ final class EndpointHandler implements Function<Request, Response> {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Object parse(String source, Class<?> type) {
-
         if (type == String.class) {
 
             if (source == null) return null;
@@ -189,52 +181,7 @@ final class EndpointHandler implements Function<Request, Response> {
     }
 
 
-    private String getContentType() {
-
-        if (contentType != null) return contentType;
-
-        if (target.isAnnotationPresent(Get.class)) {
-            contentType = target.getAnnotation(Get.class)
-                    .produces();
-
-            return contentType;
-        }
-
-        if (target.isAnnotationPresent(Post.class)) {
-            contentType = target.getAnnotation(Post.class)
-                    .produces();
-
-            return contentType;
-        }
-
-        if (target.isAnnotationPresent(Delete.class)) {
-            contentType = target.getAnnotation(Delete.class)
-                    .produces();
-
-            return contentType;
-        }
-
-        if (target.isAnnotationPresent(Put.class)) {
-            contentType = target.getAnnotation(Put.class)
-                    .produces();
-
-            return contentType;
-        }
-
-        if (target.isAnnotationPresent(Patch.class)) {
-            contentType = target.getAnnotation(Patch.class)
-                    .produces();
-
-            return contentType;
-        }
-
-        contentType = "application/json";
-
-        return contentType;
-    }
-
     private MessageConverter getMessageConverter(Request request) {
-
         Optional<Header> opHeader = request.getHeader("Accept");
 
         if (opHeader.isPresent()) {
@@ -246,12 +193,10 @@ final class EndpointHandler implements Function<Request, Response> {
 
     @Override
     public Response apply(Request request) {
-
         try {
-
             MessageConverter converter = getMessageConverter(request);
 
-            Object result = invoke(buildArguments(request));
+            Object result = mapping.call(parent, buildArguments(request));
 
             if (result == null) {
                 return new EmptyResponse(StatusCode.OK);
@@ -290,21 +235,10 @@ final class EndpointHandler implements Function<Request, Response> {
     private List<Header> getHeaders(MessageConverter converter) {
         List<Header> headers = new ArrayList<>();
         headers.add(new Header("Content-Type", converter.getContentType()));
-
         return headers;
     }
 
-    private Object invoke(Object[] args) {
-        try {
-            return target.invoke(parent, args);
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException(e);
-        }
-
-    }
-
     private Response convert(TypedResponse<?> response, MessageConverter converter) {
-
         if (response.getBody() == null) {
             return new EmptyResponse(response.getStatusCode());
         }
