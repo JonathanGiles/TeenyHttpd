@@ -368,7 +368,7 @@ public void setList(List<? extends ObjectC> list) {
 }
 
 @JsonDeserialize(as = ObjectC.class)
-public void setC(C c) {
+public void setC(ObjectC c) {
     this.c = c;
 }
 ```
