@@ -363,7 +363,7 @@ Similar to jackson to parse a ambiguous property, you can use the `@JsonDeserial
 
 ```java
 @JsonDeserialize(contentAs = ObjectC.class)
-public void setList(List<? extends C> list) {
+public void setList(List<? extends ObjectC> list) {
     this.list = list;
 }
 
